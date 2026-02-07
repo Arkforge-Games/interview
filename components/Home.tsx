@@ -1,9 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
-import { SessionMode, HistoryItem } from '../types';
+import { SessionMode, HistoryItem, UserProfile } from '../types';
 import { getHistory, getUserProfile, saveUserProfile } from '../services/historyService';
+import { getCurrentUser, loginUser, loginAsGuest, logoutUser } from '../services/authService';
+import { extractTextFromFile } from '../services/documentService';
 import { 
-  Play, Briefcase, Target, Award, Calendar, ChevronRight, Settings, BookOpen, Star, ShieldCheck, Zap, User, X, FileText, Upload
+  Play, Briefcase, Target, Award, Calendar, ChevronRight, BookOpen, Star, ShieldCheck, Zap, User, X, FileText, Upload, LogIn, LogOut
 } from 'lucide-react';
 
 interface Props {
@@ -23,24 +25,69 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [stats, setStats] = useState({ total: 0, avg: 0 });
   const [showProfile, setShowProfile] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   const [cvText, setCvText] = useState("");
   const [savedCv, setSavedCv] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [loginEmail, setLoginEmail] = useState("");
 
   useEffect(() => {
-    getHistory().then(items => {
+    // Check auth status, auto-login as guest if no user
+    getCurrentUser().then(async (user) => {
+      if (!user) {
+        user = await loginAsGuest();
+      }
+      setCurrentUser(user);
+      loadUserData(user);
+    });
+  }, []);
+
+  const loadUserData = async (user: UserProfile) => {
+    if (user.cvText) {
+      setCvText(user.cvText);
+      setSavedCv(true);
+    }
+    
+    // Only load history for logged in users, or if it's guest just show local
+    if (!user.isGuest) {
+      const items = await getHistory();
+      // In a real app, we filter by user.id here. For now, we assume local DB is the user's DB.
+      // But let's pretend we filter:
+      // const userItems = items.filter(i => i.userId === user.id);
       setHistory(items as any);
       if (items.length > 0) {
         const sum = items.reduce((a, b) => a + (b.score || 0), 0);
         setStats({ total: items.length, avg: Math.round(sum / items.length) });
       }
-    });
-    getUserProfile().then(p => {
-      if (p.cvText) {
-        setCvText(p.cvText);
-        setSavedCv(true);
-      }
-    });
-  }, []);
+    } else {
+      setHistory([]); // Guests see no history
+      setStats({ total: 0, avg: 0 });
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!loginEmail) return;
+    const user = await loginUser(loginEmail, loginEmail.split('@')[0]);
+    setCurrentUser(user);
+    setShowLogin(false);
+    loadUserData(user);
+  };
+
+  const handleGuest = async () => {
+    const user = await loginAsGuest();
+    setCurrentUser(user);
+    setShowLogin(false);
+    loadUserData(user);
+  };
+
+  const handleLogout = async () => {
+    await logoutUser();
+    setCurrentUser(null);
+    setHistory([]);
+    setStats({ total: 0, avg: 0 });
+    setCvText("");
+    setSavedCv(false);
+  };
 
   const handleSaveProfile = async () => {
     await saveUserProfile(cvText);
@@ -48,26 +95,56 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
     setShowProfile(false);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    if (file.type === "text/plain") {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setCvText(event.target?.result as string);
-      };
-      reader.readAsText(file);
-    } else {
-      alert("For PDF or Word documents, please copy and paste the text content directly for best results.");
+    try {
+        const text = await extractTextFromFile(file);
+        setCvText(text);
+    } catch (e) {
+        alert("Failed to read file. Please copy/paste text instead.");
     }
   };
 
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+         <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl space-y-8 text-center animate-fade-in">
+            <div>
+               <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">SlayJobs</h1>
+               <p className="text-slate-500">AI Mock Interviews & Career Coaching</p>
+            </div>
+            
+            <div className="space-y-4">
+              <input 
+                type="email" 
+                placeholder="Enter email to login/signup" 
+                className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 outline-none focus:border-indigo-500 transition-colors"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+              />
+              <button onClick={handleLogin} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">
+                Continue with Email
+              </button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
+                <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-slate-400">or</span></div>
+              </div>
+              <button onClick={handleGuest} className="w-full py-4 bg-white border border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-colors">
+                Continue as Guest
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">Guest accounts do not save interview history across devices.</p>
+         </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full max-w-6xl mx-auto p-6 md:p-10 space-y-10 animate-fade-in relative">
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col md:flex-row justify-between items-start gap-6">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Interview Mastery</h1>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Welcome, {currentUser.isGuest ? "Guest" : currentUser.name}</h1>
           <p className="text-slate-500 mt-2 text-lg">Personalized AI coaching tailored to your CV and JD.</p>
         </div>
         <div className="flex gap-3">
@@ -77,6 +154,9 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
             >
               <User size={20} />
               {savedCv ? "Edit Profile" : "Upload CV"}
+            </button>
+            <button onClick={handleLogout} className="p-3 bg-white border border-slate-200 text-slate-400 rounded-2xl hover:text-red-500 hover:bg-red-50 transition-colors">
+               <LogOut size={20} />
             </button>
         </div>
       </div>
@@ -121,7 +201,12 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Recent Performance</h3>
             </div>
             <div className="space-y-4">
-              {history.length === 0 ? (
+              {currentUser.isGuest ? (
+                 <div className="p-10 border-2 border-dashed border-slate-200 rounded-[2.5rem] text-center text-slate-400">
+                    <User size={40} className="mx-auto mb-4 opacity-20" />
+                    Guest history is not saved. <br/> <button onClick={handleLogout} className="text-indigo-600 font-bold underline">Login</button> to track your progress.
+                 </div>
+              ) : history.length === 0 ? (
                 <div className="p-10 border-2 border-dashed border-slate-200 rounded-[2.5rem] text-center text-slate-400">
                   <BookOpen size={40} className="mx-auto mb-4 opacity-20" />
                   Your session records will appear here.
@@ -197,13 +282,13 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
                </div>
 
                <div className="p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 transition-colors text-center group">
-                  <input type="file" accept=".txt" onChange={handleFileUpload} className="hidden" id="cv-upload" />
+                  <input type="file" accept=".txt,.pdf,.docx,.doc" onChange={handleFileUpload} className="hidden" id="cv-upload" />
                   <label htmlFor="cv-upload" className="cursor-pointer block">
                     <div className="w-12 h-12 rounded-full bg-white text-indigo-600 mx-auto mb-3 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
                       <Upload size={20} />
                     </div>
-                    <p className="text-sm font-bold text-slate-700">Click to upload .txt file</p>
-                    <p className="text-xs text-slate-400 mt-1">or paste text directly below</p>
+                    <p className="text-sm font-bold text-slate-700">Click to upload or Drag & Drop</p>
+                    <p className="text-xs text-slate-400 mt-1">PDF, DOCX, TXT supported</p>
                   </label>
                </div>
 

@@ -26,7 +26,6 @@ export enum ExperienceLevel {
   EXECUTIVE = 'EXECUTIVE'
 }
 
-// Fix: Add missing EducationLevel enum used by VirtualCoach and DrillSession
 export enum EducationLevel {
   PRIMARY = 'PRIMARY',
   SECONDARY = 'SECONDARY',
@@ -34,7 +33,6 @@ export enum EducationLevel {
   PROFESSIONAL = 'PROFESSIONAL'
 }
 
-// Fix: Add missing DrillType enum used by DrillSession
 export enum DrillType {
   LOGIC = 'LOGIC',
   FLOW = 'FLOW',
@@ -42,7 +40,6 @@ export enum DrillType {
   IMPACT = 'IMPACT'
 }
 
-// Fix: Add missing UserPreferences interface used by Onboarding
 export interface UserPreferences {
   topics: string[];
   preferredMode: SessionMode;
@@ -63,7 +60,9 @@ export interface SessionConfig {
   experienceLevel: ExperienceLevel;
   language: string;
   mode: SessionMode;
+  focusBalance: number; // 0 (Behavioral) to 100 (Technical)
   questions: InterviewQuestion[];
+  backupQuestions: InterviewQuestion[]; 
 }
 
 export interface QuestionAnalysis {
@@ -73,13 +72,17 @@ export interface QuestionAnalysis {
   precisionScore: number;
   expertCritique: string;
   transcript: string;
-  demoAnswer: string; // Will include <u>placeholders</u>
-  demoLogicRoadmap: string[]; // ["1. Action", "2. Outcome"]
-  vocabUpgrades: { original: string; suggested: string }[];
+  demoAnswer: string; 
+  ceoDemoAnswer: string; // New field for Executive level answer
+  demoLogicRoadmap: string[]; 
+  answerFramework: {
+    name: string;
+    explanation: string;
+    steps: { step: string; detail: string }[];
+  };
   logicUpgrades: string[];
 }
 
-// Fix: Add missing AnalysisResult alias used by VirtualCoach
 export type AnalysisResult = QuestionAnalysis;
 
 export interface QuestionAnswer {
@@ -90,7 +93,6 @@ export interface QuestionAnswer {
   analysis?: QuestionAnalysis;
 }
 
-// Fix: Add missing DrillBatchResult interface used by DrillSession
 export interface DrillBatchResult {
   overallImprovement: string;
   rounds: {
@@ -107,8 +109,17 @@ export interface DrillBatchResult {
 
 export interface HistoryItem {
   id: string;
+  userId: string; // New field to link to user
   date: string;
   jobTitle: string;
   score: number;
   results: QuestionAnswer[];
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  isGuest: boolean;
+  cvText?: string;
 }

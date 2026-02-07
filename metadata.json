@@ -1,6 +1,6 @@
 {
-  "name": "Copy of SpeakFlow AI for interview",
-  "description": "An intelligent impromptu speaking coach that simulates real-world pressure and provides deep AI analysis of your speech logic, delivery, and structure.",
+  "name": "SlayJobs",
+  "description": "Stop overpaying for job coaching. SlayJobs uses your CV and JD to create custom mock interviews. Get professional feedback on your answers and slay your dream job.",
   "requestFramePermissions": [
     "camera",
     "microphone"
