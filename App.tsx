@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppStep, SessionConfig, QuestionAnswer, SessionMode, HistoryItem, ExperienceLevel } from './types';
+import { AppStep, SessionConfig, QuestionAnswer, SessionMode, HistoryItem, ExperienceLevel, UserProfile } from './types';
 import { SessionSetup } from './components/SessionSetup';
 import { Stage } from './components/Stage';
 import { Analysis } from './components/Analysis';
 import { Home } from './components/Home';
 import { analyzeAnswer } from './services/geminiService';
 import { saveHistoryItem } from './services/historyService';
+import { getCurrentUser } from './services/authService';
 import { Loader2, Sparkles } from 'lucide-react';
 
 export default function App() {
@@ -16,6 +17,11 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [practiceContext, setPracticeContext] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    getCurrentUser().then(setCurrentUser);
+  }, []);
 
   const handleStartSession = (mode?: SessionMode) => {
     setPracticeContext(null); // Clear previous practice context
@@ -39,36 +45,59 @@ export default function App() {
     }]);
   };
 
-  const processAnalysis = async () => {
+  const handleAllFinished = (finalBlob?: Blob, finalDuration?: number, finalIndex?: number) => {
+    let finalAnswers = [...answers];
+    if (finalBlob && sessionConfig && finalIndex !== undefined) {
+       const q = sessionConfig.questions[finalIndex];
+       const lastAnswer = {
+          questionId: q.id,
+          questionText: q.text,
+          audioBlob: finalBlob,
+          duration: finalDuration || 0
+       };
+       finalAnswers = [...finalAnswers, lastAnswer];
+       setAnswers(finalAnswers); // Update state for UI consistency
+    }
+    processAnalysis(finalAnswers);
+  };
+
+  const processAnalysis = async (answersToAnalyze: QuestionAnswer[]) => {
     if (!sessionConfig) return;
     setIsAnalyzing(true);
     setAnalysisProgress(0);
     
     const analyzedAnswers: QuestionAnswer[] = [];
-    for (let i = 0; i < answers.length; i++) {
-      setAnalysisProgress(Math.round(((i) / answers.length) * 100));
+    for (let i = 0; i < answersToAnalyze.length; i++) {
+      setAnalysisProgress(Math.round(((i) / answersToAnalyze.length) * 100));
       const res = await analyzeAnswer(
-        answers[i].audioBlob,
-        answers[i].questionText,
+        answersToAnalyze[i].audioBlob,
+        answersToAnalyze[i].questionText,
         sessionConfig.jobTitle,
         sessionConfig.jobDescription,
         sessionConfig.cvText,
-        sessionConfig.experienceLevel
+        sessionConfig.experienceLevel,
+        sessionConfig.language || "English"
       );
-      analyzedAnswers.push({ ...answers[i], analysis: res });
+      analyzedAnswers.push({ ...answersToAnalyze[i], analysis: res });
     }
     
     setAnalysisProgress(100);
     const avgScore = Math.round(analyzedAnswers.reduce((a, b) => a + (b.analysis?.overallScore || 0), 0) / analyzedAnswers.length);
     
-    const historyItem: HistoryItem = {
-      id: Date.now().toString(),
-      date: new Date().toISOString(),
-      jobTitle: sessionConfig.jobTitle,
-      score: avgScore,
-      results: analyzedAnswers
-    };
-    await saveHistoryItem(historyItem as any);
+    // Refresh user state to ensure we have latest info before saving
+    const user = await getCurrentUser();
+
+    if (user && !user.isGuest) {
+      const historyItem: HistoryItem = {
+        id: Date.now().toString(),
+        userId: user.id,
+        date: new Date().toISOString(),
+        jobTitle: sessionConfig.jobTitle,
+        score: avgScore,
+        results: analyzedAnswers
+      };
+      await saveHistoryItem(historyItem as any);
+    }
     
     setAnswers(analyzedAnswers);
     setIsAnalyzing(false);
@@ -115,7 +144,7 @@ export default function App() {
         <Stage 
           config={sessionConfig} 
           onFinishQuestion={handleFinishQuestion} 
-          onAllFinished={processAnalysis} 
+          onAllFinished={handleAllFinished} 
         />
       )}
       {step === AppStep.ANALYSIS && sessionConfig && (

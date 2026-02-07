@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { SessionConfig, ExperienceLevel, SessionMode, InterviewQuestion } from '../types';
 import { generateInterviewQuestions } from '../services/geminiService';
 import { getUserProfile, saveUserProfile } from '../services/historyService';
+import { extractTextFromFile } from '../services/documentService';
 import { 
-  Briefcase, FileText, User, ChevronRight, ArrowLeft, Loader2, CheckCircle2, UserCircle, Target, X, Upload
+  Briefcase, FileText, UserCircle, Upload, CheckCircle2, AlertCircle, Sparkles, RefreshCcw, Layers, Loader2, ArrowLeft, Type, Paperclip, Globe, Sliders
 } from 'lucide-react';
 
 interface Props {
@@ -19,170 +19,129 @@ interface Props {
   };
 }
 
+const LANGUAGES = ['English', 'Mandarin', 'Cantonese', 'Spanish', 'French', 'German', 'Japanese', 'Korean'];
+
 export const SessionSetup: React.FC<Props> = ({ onNext, onHome, practiceContext }) => {
-  const [step, setStep] = useState<'FIELDS' | 'REVIEW'>('FIELDS');
   const [loading, setLoading] = useState(false);
-  const [jobTitle, setJobTitle] = useState("");
-  const [company, setCompany] = useState("");
-  const [years, setYears] = useState("");
   const [jd, setJd] = useState("");
   const [cvText, setCvText] = useState("");
   const [level, setLevel] = useState<ExperienceLevel>(ExperienceLevel.FRESH_GRAD);
-  const [allQuestions, setAllQuestions] = useState<InterviewQuestion[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [questionCount, setQuestionCount] = useState(5); 
+  const [language, setLanguage] = useState("English");
+  const [focusBalance, setFocusBalance] = useState(50); // 0-100 Slider
+  const [cvInputMode, setCvInputMode] = useState<'TEXT' | 'FILE'>('TEXT'); // Default to Text
   
-  // New States
-  const [showCvModal, setShowCvModal] = useState(false);
-  const [errors, setErrors] = useState({ title: false, jd: false });
+  const [dragActive, setDragActive] = useState(false);
+  const [fileError, setFileError] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [errors, setErrors] = useState({ jd: false });
 
-  // Load profile or practice context
   useEffect(() => {
     getUserProfile().then(p => {
       if (p.cvText) setCvText(p.cvText);
     });
 
     if (practiceContext) {
-      setJobTitle(practiceContext.jobTitle);
       setJd(practiceContext.jd);
       setLevel(practiceContext.level);
-      // Auto-generate if it's a practice session
-      handleGenerate(practiceContext);
     }
   }, []);
 
-  const handleGenerate = async (ctx = practiceContext) => {
-    const titleVal = jobTitle || ctx?.jobTitle || "";
-    const jdVal = jd || ctx?.jd || "";
-    
-    setErrors({
-        title: !titleVal.trim(),
-        jd: !jdVal.trim()
-    });
+  const handleGenerateAndStart = async () => {
+    const jdVal = jd || practiceContext?.jd || "";
+    setErrors({ jd: !jdVal.trim() });
 
-    if (!titleVal.trim() || !jdVal.trim()) {
-        return; // Stop if invalid
-    }
+    if (!jdVal.trim()) return; 
 
     setLoading(true);
     try {
-      const qs = await generateInterviewQuestions(
-        titleVal, 
+      const rawQuestions = await generateInterviewQuestions(
+        "The Role described in JD", 
         jdVal, 
         cvText, 
-        level || ctx?.level, 
-        years || "N/A", 
-        "English",
-        ctx?.weaknesses,
-        ctx?.excludedQuestions
+        level || practiceContext?.level, 
+        "N/A", 
+        language,
+        focusBalance,
+        practiceContext?.weaknesses,
+        practiceContext?.excludedQuestions
       );
-      setAllQuestions(qs);
-      // Safely select up to 5
-      setSelectedIds(new Set(qs.slice(0, 5).map(q => q.id)));
-      setStep('REVIEW');
+
+      const { selected, backup } = balanceQuestions(rawQuestions, questionCount);
+
+      onNext({
+        jobTitle: "Target Role", 
+        companyName: "",
+        yearsOfExperience: "",
+        jobDescription: jdVal,
+        cvText,
+        experienceLevel: level,
+        language: language,
+        mode: SessionMode.MOCK_INTERVIEW,
+        focusBalance: focusBalance,
+        questions: selected,
+        backupQuestions: backup
+      });
+
     } catch (e) {
       alert("Failed to generate questions. Please try again.");
-    } finally {
+      console.error(e);
       setLoading(false);
-    }
+    } 
   };
 
-  const toggleQuestion = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) {
-      if (next.size > 1) next.delete(id);
-    } else {
-      if (next.size < 5) next.add(id);
-    }
-    setSelectedIds(next);
-  };
-
-  const startInterview = () => {
-    const selected = allQuestions.filter(q => selectedIds.has(q.id));
-    onNext({
-      jobTitle,
-      companyName: company,
-      yearsOfExperience: years,
-      jobDescription: jd,
-      cvText,
-      experienceLevel: level,
-      language: "English",
-      mode: SessionMode.MOCK_INTERVIEW,
-      questions: selected
-    });
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const balanceQuestions = (all: InterviewQuestion[], count: number) => {
+    if (all.length <= count) return { selected: all, backup: [] };
     
-    if (file.type === "text/plain") {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setCvText(event.target?.result as string);
-      };
-      reader.readAsText(file);
-    } else {
-      alert("For PDF or Word documents, please copy and paste the text content directly for best results.");
-    }
+    // Simple slice is enough here because the generation logic in geminiService 
+    // already handles the distribution based on focusBalance.
+    const selected = all.slice(0, count);
+    const backup = all.slice(count);
+
+    return { selected, backup };
   };
 
-  const handleSaveCv = async () => {
-    if (cvText) {
-        await saveUserProfile(cvText);
-    }
-    setShowCvModal(false);
+  const handleFileProcess = async (file: File) => {
+      setFileError("");
+      try {
+          const text = await extractTextFromFile(file);
+          if (text.trim().length < 50) {
+              setFileError("Could not extract enough text.");
+          } else {
+              setCvText(text);
+              setFileName(file.name);
+              saveUserProfile(text);
+          }
+      } catch (e) {
+          console.error(e);
+          setFileError("Error reading file.");
+      }
   };
 
-  if (step === 'REVIEW') {
-    return (
-      <div className="min-h-screen max-w-4xl mx-auto p-6 md:p-10 space-y-8 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <button onClick={() => setStep('FIELDS')} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors font-semibold">
-            <ArrowLeft size={20} /> Back to Setup
-          </button>
-          <div className="text-right">
-            <h2 className="text-2xl font-black text-slate-900">Recommended Questions</h2>
-            <p className="text-sm text-slate-500">Pick 5 questions for your personalized session.</p>
-          </div>
-        </div>
+  const handleDrag = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
+      else if (e.type === "dragleave") setDragActive(false);
+  };
 
-        <div className="grid grid-cols-1 gap-4">
-          {allQuestions.map((q) => (
-            <button
-              key={q.id}
-              onClick={() => toggleQuestion(q.id)}
-              className={`text-left p-5 rounded-3xl border-2 transition-all flex items-start gap-4 ${
-                selectedIds.has(q.id) 
-                ? 'bg-indigo-50 border-indigo-600 shadow-sm' 
-                : 'bg-white border-slate-100 opacity-60 hover:opacity-100'
-              }`}
-            >
-              <div className={`mt-1 ${selectedIds.has(q.id) ? 'text-indigo-600' : 'text-slate-300'}`}>
-                {selectedIds.has(q.id) ? <CheckCircle2 size={24} /> : <div className="w-6 h-6 rounded-full border-2 border-slate-200" />}
-              </div>
-              <div className="flex-1">
-                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1 block">{q.category}</span>
-                <p className="text-slate-900 font-bold leading-tight">{q.text}</p>
-              </div>
-            </button>
-          ))}
-        </div>
+  const handleDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragActive(false);
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          handleFileProcess(e.dataTransfer.files[0]);
+      }
+  };
 
-        <div className="fixed bottom-8 left-0 right-0 px-6 flex justify-center">
-            <button
-              onClick={startInterview}
-              disabled={selectedIds.size !== 5}
-              className="bg-indigo-600 text-white px-12 py-4 rounded-full font-black shadow-2xl hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2"
-            >
-              Enter Mock Interview ({selectedIds.size}/5) <ChevronRight />
-            </button>
-        </div>
-      </div>
-    );
-  }
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          handleFileProcess(e.target.files[0]);
+      }
+  };
 
   return (
-    <div className="min-h-screen max-w-6xl mx-auto p-6 md:p-10 space-y-10 animate-fade-in relative">
+    <div className="min-h-screen max-w-7xl mx-auto p-6 md:p-10 space-y-10 animate-fade-in relative pb-24">
       <div className="flex items-center justify-between border-b border-slate-100 pb-8">
         <button onClick={onHome} className="p-3 hover:bg-white rounded-full transition-colors text-slate-400">
           <ArrowLeft size={24} />
@@ -191,139 +150,214 @@ export const SessionSetup: React.FC<Props> = ({ onNext, onHome, practiceContext 
         <div className="w-10"></div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Job Details & CV */}
-        <div className="lg:col-span-1 space-y-6">
-          
-          {/* 1. Job Details Card */}
-          <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm space-y-5">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Briefcase size={14}/> Target Role <span className="text-red-500">*</span></h3>
-            <div className="space-y-4">
-              <div>
-                <input 
-                    type="text" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)}
-                    placeholder="Job Title (Required)"
-                    className={`w-full text-base font-bold border-b py-2 outline-none focus:border-indigo-600 transition-colors ${errors.title ? 'border-red-400 placeholder-red-300' : 'border-slate-100'}`}
-                />
-                {errors.title && <p className="text-[10px] text-red-500 mt-1 font-bold">Job Title is required.</p>}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Left Column (JD & CV) */}
+        <div className="lg:col-span-7 flex flex-col gap-8">
+            {/* Job Description Section */}
+            <div className={`bg-white border rounded-[2rem] p-8 shadow-sm transition-all duration-300 ${errors.jd ? 'border-red-300 ring-4 ring-red-50' : 'border-slate-200 focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50'}`}>
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${errors.jd ? 'text-red-500' : 'text-slate-400'}`}>
+                      <Briefcase size={14}/> Job Post Content <span className="text-red-500">*</span>
+                  </h3>
               </div>
-              <input 
-                type="text" value={company} onChange={(e) => setCompany(e.target.value)}
-                placeholder="Company Name"
-                className="w-full text-base font-bold border-b border-slate-100 py-2 outline-none focus:border-indigo-600"
-              />
-              <input 
-                type="text" value={years} onChange={(e) => setYears(e.target.value)}
-                placeholder="Years of Experience"
-                className="w-full text-base font-bold border-b border-slate-100 py-2 outline-none focus:border-indigo-600"
-              />
-            </div>
-          </div>
-          
-          {/* 2. Experience Level Card */}
-          <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm space-y-4">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><UserCircle size={14}/> Seniority</h3>
-            <div className="flex flex-wrap gap-2">
-              {Object.values(ExperienceLevel).map((lvl) => (
-                <button 
-                  key={lvl}
-                  onClick={() => setLevel(lvl)}
-                  className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${level === lvl ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
-                >
-                  {lvl.replace('_', ' ')}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 3. CV Section (Button style) */}
-          <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm space-y-4">
-             <div className="flex justify-between items-start">
-                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><FileText size={14}/> Your Profile</h3>
-                 {cvText && <CheckCircle2 size={16} className="text-green-500" />}
-             </div>
-             <p className="text-xs text-slate-500 leading-relaxed">
-                {cvText 
-                    ? "CV loaded. The questions will be tailored to your specific background." 
-                    : "Upload your CV to get questions that match your actual experience."}
-             </p>
-             <button 
-                  onClick={() => setShowCvModal(true)}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold transition-all shadow-sm border w-full text-sm ${cvText ? 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100' : 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800'}`}
-              >
-                  {cvText ? "Review / Edit CV" : "Upload CV"}
-             </button>
-          </div>
-        </div>
-
-        {/* Right Column: JD & Action */}
-        <div className="lg:col-span-2 flex flex-col h-full gap-8">
-            <div className={`bg-white border rounded-[2.5rem] p-8 shadow-sm flex flex-col flex-1 transition-colors ${errors.jd ? 'border-red-200 bg-red-50/10' : 'border-slate-200'}`}>
-              <h3 className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 mb-4 ${errors.jd ? 'text-red-400' : 'text-slate-400'}`}>
-                  <Briefcase size={14}/> Job Post Content <span className="text-red-500">*</span>
-              </h3>
               <textarea 
                 value={jd} onChange={(e) => setJd(e.target.value)}
-                placeholder="Paste the full Job Description here. This is crucial for generating relevant questions..."
-                className="flex-1 w-full bg-slate-50 rounded-3xl p-6 text-sm text-slate-600 outline-none resize-none border border-slate-100 focus:border-indigo-600 focus:bg-white transition-all"
+                placeholder="Paste the full Job Description here. SlayJobs will analyze this to generate tailored technical & scenario questions..."
+                className="w-full h-64 bg-slate-50 rounded-xl p-5 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-transparent focus:bg-white focus:border-indigo-200 transition-colors leading-relaxed"
               />
-              {errors.jd && <p className="text-xs text-red-500 font-bold mt-3 px-2">Job Description is required.</p>}
+              {errors.jd && <p className="text-xs text-red-500 font-bold mt-3 px-2 flex items-center gap-1"><AlertCircle size={12}/> Please paste a job description to proceed.</p>}
+            </div>
+
+            {/* CV / Profile Section (Moved to Left) */}
+            <div className="bg-white border border-slate-200 rounded-[2rem] p-6 md:p-8 shadow-sm flex-1 flex flex-col min-h-[400px]">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><FileText size={14}/> Your Profile (CV)</h3>
+                    {cvText && <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1"><CheckCircle2 size={12}/> Loaded</span>}
+                </div>
+
+                {/* Tabs */}
+                <div className="flex p-1 bg-slate-100 rounded-xl mb-4">
+                  <button 
+                    onClick={() => setCvInputMode('TEXT')}
+                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${cvInputMode === 'TEXT' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    <Type size={14}/> Paste Text
+                  </button>
+                  <button 
+                    onClick={() => setCvInputMode('FILE')}
+                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${cvInputMode === 'FILE' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    <Paperclip size={14}/> Upload File
+                  </button>
+                </div>
+
+                {cvInputMode === 'TEXT' ? (
+                   <div className="flex-1 flex flex-col">
+                      <textarea 
+                          value={cvText}
+                          onChange={(e) => {
+                            setCvText(e.target.value);
+                            saveUserProfile(e.target.value);
+                          }}
+                          className="w-full flex-1 bg-slate-50 rounded-xl p-5 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-transparent focus:bg-white focus:border-indigo-200 transition-colors leading-relaxed"
+                          placeholder="Paste your resume text here directly..."
+                      />
+                   </div>
+                ) : (
+                  <div 
+                      className={`flex-1 rounded-2xl border-2 transition-all relative group overflow-hidden flex flex-col ${
+                          dragActive 
+                          ? 'border-indigo-500 bg-indigo-50' 
+                          : fileName 
+                              ? 'border-emerald-200 bg-emerald-50/30'
+                              : 'border-dashed border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-slate-100'
+                      }`}
+                      onDragEnter={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDragOver={handleDrag}
+                      onDrop={handleDrop}
+                  >
+                      <input type="file" id="cv-upload-drop" className="hidden" accept=".txt,.pdf,.docx,.doc" onChange={handleFileInput} />
+                      
+                      {!fileName ? (
+                          <label htmlFor="cv-upload-drop" className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer p-8 text-center">
+                              <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4 text-indigo-500 group-hover:scale-110 group-hover:text-indigo-600 transition-all">
+                                  <Upload size={24} />
+                              </div>
+                              <p className="font-bold text-slate-700 text-lg">Drop CV Here</p>
+                              <p className="text-xs text-slate-400 mt-2 leading-relaxed max-w-[200px]">PDF, Word, or Text files supported.</p>
+                          </label>
+                      ) : (
+                          <div className="absolute inset-0 p-6 flex flex-col items-center justify-center text-center">
+                              <div className="w-16 h-16 rounded-2xl bg-white shadow-sm border border-emerald-100 flex items-center justify-center mb-4 text-emerald-500">
+                                  <FileText size={32} />
+                              </div>
+                              <h4 className="font-bold text-slate-900 truncate max-w-[200px]">{fileName}</h4>
+                              <p className="text-xs text-slate-500 mt-1 mb-6">File parsed successfully.</p>
+                              
+                              <div className="flex gap-3">
+                                  <label htmlFor="cv-upload-drop" className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-50 transition-colors flex items-center gap-2">
+                                      <RefreshCcw size={12}/> Replace
+                                  </label>
+                                  <button onClick={() => { setCvText(""); setFileName(""); }} className="px-4 py-2 bg-red-50 border border-red-100 rounded-lg text-xs font-bold text-red-500 hover:bg-red-100 transition-colors">
+                                      Remove
+                                  </button>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+                )}
+                
+                {fileError && <p className="text-xs text-red-500 font-bold mt-4 flex items-center gap-1 bg-red-50 p-3 rounded-lg"><AlertCircle size={14}/> {fileError}</p>}
+            </div>
+        </div>
+
+        {/* Right Column (Seniority, Settings, Action) */}
+        <div className="lg:col-span-5 flex flex-col gap-8">
+            {/* Job Seniority (Moved to Right) */}
+            <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-6"><UserCircle size={14}/> Job Seniority</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {Object.values(ExperienceLevel).map((lvl) => (
+                    <button 
+                    key={lvl}
+                    onClick={() => setLevel(lvl)}
+                    className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all transform active:scale-95 ${
+                        level === lvl 
+                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                        : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50 hover:border-slate-300'
+                    }`}
+                    >
+                    {lvl.replace('_', ' ')}
+                    </button>
+                ))}
+                </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm">
+                 <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                       <Globe size={14}/> Interview Language
+                    </h3>
+                 </div>
+                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    {LANGUAGES.map(lang => (
+                        <button
+                           key={lang}
+                           onClick={() => setLanguage(lang)}
+                           className={`px-3 py-2 rounded-lg text-xs font-bold transition-all border ${language === lang ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-indigo-200'}`}
+                        >
+                           {lang}
+                        </button>
+                    ))}
+                 </div>
+            </div>
+
+            {/* Slider Section: Difficulty/Focus */}
+            <div className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm">
+                 <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                       <Sliders size={14}/> Interview Difficulty & Focus
+                    </h3>
+                    <span className="text-indigo-600 font-black text-xs">
+                        {focusBalance < 30 ? "Behavioral Focus" : focusBalance > 70 ? "Technical Focus" : "Balanced"}
+                    </span>
+                 </div>
+                 <input 
+                    type="range" 
+                    min="0" 
+                    max="100" 
+                    step="10" 
+                    value={focusBalance} 
+                    onChange={(e) => setFocusBalance(parseInt(e.target.value))}
+                    className="w-full h-2 bg-gradient-to-r from-emerald-200 via-indigo-200 to-rose-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                 />
+                 <div className="flex justify-between text-[10px] text-slate-400 font-bold mt-2">
+                    <span>Non-Technical</span>
+                    <span>Mixed</span>
+                    <span>Technical</span>
+                 </div>
+                 <div className="mt-3 bg-slate-50 p-3 rounded-lg text-[10px] text-slate-500 leading-snug italic">
+                    {focusBalance < 30 
+                       ? "Questions will focus on culture fit, soft skills, and personality."
+                       : focusBalance > 70 
+                       ? "Heavy focus on hard skills, technical scenarios, and problem solving."
+                       : "A standard interview mix of behavioral and technical questions."
+                    }
+                 </div>
+            </div>
+            
+            <div className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm">
+                 <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                       <Layers size={14}/> Interview Length
+                    </h3>
+                    <span className="text-indigo-600 font-black text-sm">{questionCount} Questions</span>
+                 </div>
+                 <input 
+                    type="range" 
+                    min="3" 
+                    max="10" 
+                    step="1" 
+                    value={questionCount} 
+                    onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+                    className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                 />
+                 <div className="flex justify-between text-[10px] text-slate-400 font-bold mt-2">
+                    <span>3 (Short)</span>
+                    <span>10 (Full)</span>
+                 </div>
             </div>
 
             <button 
-                onClick={() => handleGenerate()}
+                onClick={handleGenerateAndStart}
                 disabled={loading}
-                className="w-full py-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-3 transform active:scale-[0.99]"
+                className="w-full py-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-3 transform active:scale-[0.99] group"
             >
-                {loading ? <Loader2 className="animate-spin" /> : <>Generate Personalized Interview <ChevronRight /></>}
+                {loading ? <Loader2 className="animate-spin" /> : <>Start Mock Interview <Sparkles className="group-hover:text-yellow-300 transition-colors" /></>}
             </button>
         </div>
       </div>
-
-       {/* CV Modal (Similar to Home.tsx) */}
-       {showCvModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-[2rem] w-full max-w-2xl p-8 shadow-2xl border border-slate-100 relative">
-             <button onClick={() => setShowCvModal(false)} className="absolute top-6 right-6 p-2 rounded-full hover:bg-slate-100 text-slate-400">
-               <X size={24} />
-             </button>
-             
-             <div className="space-y-6">
-               <div className="space-y-2">
-                 <h2 className="text-2xl font-black text-slate-900">Your CV Content</h2>
-                 <p className="text-slate-500">Paste your resume text below to personalize the interview questions.</p>
-               </div>
-
-               <div className="p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 transition-colors text-center group">
-                  <input type="file" accept=".txt" onChange={handleFileUpload} className="hidden" id="cv-upload-modal" />
-                  <label htmlFor="cv-upload-modal" className="cursor-pointer block">
-                    <div className="w-12 h-12 rounded-full bg-white text-indigo-600 mx-auto mb-3 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                      <Upload size={20} />
-                    </div>
-                    <p className="text-sm font-bold text-slate-700">Click to upload .txt file</p>
-                    <p className="text-xs text-slate-400 mt-1">or paste text directly below</p>
-                  </label>
-               </div>
-
-               <div className="space-y-2">
-                 <textarea 
-                   value={cvText}
-                   onChange={(e) => setCvText(e.target.value)}
-                   placeholder="Paste your resume content here..."
-                   className="w-full h-64 bg-white border border-slate-200 rounded-2xl p-4 text-sm leading-relaxed text-slate-600 focus:border-indigo-600 outline-none resize-none"
-                 />
-               </div>
-
-               <button 
-                 onClick={handleSaveCv}
-                 className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg"
-               >
-                 Save & Use for Session
-               </button>
-             </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
