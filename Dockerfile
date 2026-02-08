@@ -5,7 +5,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 ARG GEMINI_API_KEY=""
-RUN GEMINI_API_KEY=${GEMINI_API_KEY} npm run build
+RUN echo "GEMINI_API_KEY=${GEMINI_API_KEY}" > .env
+RUN npm run build
 
 # Stage 2: Production
 FROM node:20-alpine
