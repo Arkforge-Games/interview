@@ -33,7 +33,9 @@ jobs:
         with:
           context: .
           push: true
-          tags: n8nhobbylandacr.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_6900EC1D3B544666B2087AEAB3DD2AC0 }}/interview-app:${{ github.sha }}
+          tags: n8nhobbylandacr.azurecr.io/interview-app:${{ github.sha }}
+          build-args: |
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
           file: ./Dockerfile
 
   deploy:
@@ -49,5 +51,5 @@ jobs:
         with:
           app-name: 'hobbyland-interview'
           slot-name: 'Production'
-          images: 'n8nhobbylandacr.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_6900EC1D3B544666B2087AEAB3DD2AC0 }}/interview-app:${{ github.sha }}'
+          images: 'n8nhobbylandacr.azurecr.io/interview-app:${{ github.sha }}'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_465F336021D841F09C12DAC7F7D46C8A }}
