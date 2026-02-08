@@ -25,39 +25,29 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: n8nhobbylandacr.azurecr.io/
-          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_17D9D8BF11AF4EA4815D782266DD80F1 }}
-          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_AA39173E6E784C359836809D2A681B5B }}
+          username: ${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_6900EC1D3B544666B2087AEAB3DD2AC0 }}
+          password: ${{ secrets.AZUREAPPSERVICE_CONTAINERPASSWORD_823D374D75434E63A1B6CA15D54CC73A }}
 
       - name: Build and push container image to registry
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: n8nhobbylandacr.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_17D9D8BF11AF4EA4815D782266DD80F1 }}/interview-app:${{ github.sha }}
+          tags: n8nhobbylandacr.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_6900EC1D3B544666B2087AEAB3DD2AC0 }}/interview-app:${{ github.sha }}
           file: ./Dockerfile
 
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
-
+    
     needs: build
     
     steps:
       
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_274BD68448174EA1BF1C7AA9DEB64A5A }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_C3659E458FC04051950025A9731E37DE }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_AC43647310774F47B950C66DD8C994BC }}
-
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v2
         with:
           app-name: 'hobbyland-interview'
           slot-name: 'Production'
-          images: 'n8nhobbylandacr.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_17D9D8BF11AF4EA4815D782266DD80F1 }}/interview-app:${{ github.sha }}'
-          
+          images: 'n8nhobbylandacr.azurecr.io/${{ secrets.AZUREAPPSERVICE_CONTAINERUSERNAME_6900EC1D3B544666B2087AEAB3DD2AC0 }}/interview-app:${{ github.sha }}'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_465F336021D841F09C12DAC7F7D46C8A }}
