@@ -90,11 +90,16 @@ export const generateInterviewQuestions = async (
     1. LENGTH: Every question must be between 17 and 25 words. Concise, punchy, and professional.
     2. STYLE: Direct questions ONLY. Do NOT use preambles like "Given your experience at Company X..." or "I see you did Y...". Just ask the question immediately.
     3. FOCUS: Do NOT praise or recognize past achievements in the question text. The candidate knows their own history. Focus strictly on how they will apply skills to the NEW role.
-    4. TECHNICAL SPECIFICITY: For "Technical/Scenario" questions, DO NOT ask vague questions like "Tell me about a time you used Java." Instead, present a specific, realistic scenario or task derived from the JD (e.g., "Our trading system has high latency during market open. How would you profile and optimize the Java garbage collection to fix this?"). Ask HOW they would resolve a specific task.
-    
+    4. PRACTICAL SCENARIOS ONLY: ALL questions must be grounded in realistic, task-related scenarios derived from the JD.
+       - DO NOT ask theoretical or generic questions like "Tell me about a time you used Java", "What is your greatest strength?", or "What do you know about X concept?".
+       - EVERY question should present a specific workplace situation, task, or problem that the candidate would actually face in this role.
+       - For Technical: Present a concrete problem to solve (e.g., "Our trading system has high latency during market open. How would you profile and optimize the Java garbage collection?").
+       - For Experience: Frame as a practical challenge (e.g., "A key stakeholder rejects your proposed architecture mid-sprint. Walk me through how you handle this.").
+       - For Behavioral/Intro: Use realistic workplace dilemmas (e.g., "Two senior engineers on your team disagree on the database migration approach. How do you resolve it and keep the project on track?").
+
     DISTRIBUTION REQUIREMENTS (Total 10 Questions):
-    1. ${introCount} questions: "Intro/General/Behavioral" (Culture fit, Soft skills).
-    2. ${expCount} questions: "Experience Application" (Applying past work to new problems).
+    1. ${introCount} questions: "Intro/General/Behavioral" (Culture fit, Soft skills — framed as practical workplace scenarios).
+    2. ${expCount} questions: "Experience Application" (Applying past work to new practical problems).
     3. ${techCount} questions: "Technical/Scenario" (Specific problem-solving tasks based on the JD).
 
     Output JSON format: [{"text": string, "category": string}]

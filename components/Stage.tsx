@@ -15,9 +15,10 @@ export const Stage: React.FC<Props> = ({ config, onFinishQuestion, onAllFinished
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
-  const [cameraOn, setCameraOn] = useState(true);
+  const [cameraOn, setCameraOn] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  
+  const [micDenied, setMicDenied] = useState(false);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -31,22 +32,42 @@ export const Stage: React.FC<Props> = ({ config, onFinishQuestion, onAllFinished
     return () => clearInterval(interval);
   }, [isRecording]);
 
-  useEffect(() => {
-    const setup = async () => {
+  const requestMic = async () => {
+    try {
+      setMicDenied(false);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      setIsReady(true);
+    } catch (e) {
+      setMicDenied(true);
+      console.error("Mic Error:", e);
+    }
+  };
+
+  const toggleCamera = async () => {
+    if (cameraOn) {
+      // Turn off camera tracks
+      streamRef.current?.getVideoTracks().forEach(t => t.stop());
+      setCameraOn(false);
+    } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        streamRef.current = stream;
-        // Also try setting immediate ref if available, though callback ref handles the general case
-        if (videoRef.current) {
-            videoRef.current.srcObject = stream;
+        const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const videoTrack = videoStream.getVideoTracks()[0];
+        if (streamRef.current) {
+          streamRef.current.addTrack(videoTrack);
         }
-        setIsReady(true);
+        if (videoRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+        }
+        setCameraOn(true);
       } catch (e) {
-        alert("Camera/Mic permission needed. Please allow access to start the interview.");
-        console.error("Media Error:", e);
+        console.error("Camera Error:", e);
       }
-    };
-    setup();
+    }
+  };
+
+  useEffect(() => {
+    requestMic();
     return () => {
       streamRef.current?.getTracks().forEach(t => t.stop());
     };
@@ -151,7 +172,7 @@ export const Stage: React.FC<Props> = ({ config, onFinishQuestion, onAllFinished
                 {!cameraOn && <div className="absolute inset-0 flex items-center justify-center text-slate-400 bg-slate-800 rounded-xl"><VideoOff size={32} /></div>}
                 
                 <div className="absolute bottom-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => setCameraOn(!cameraOn)} className="p-2 bg-black/60 text-white rounded-full hover:bg-indigo-600 transition-colors">
+                    <button onClick={toggleCamera} className="p-2 bg-black/60 text-white rounded-full hover:bg-indigo-600 transition-colors">
                         {cameraOn ? <Video size={16}/> : <VideoOff size={16}/>}
                     </button>
                 </div>
@@ -206,9 +227,23 @@ export const Stage: React.FC<Props> = ({ config, onFinishQuestion, onAllFinished
                   <Square className="w-6 h-6 md:w-8 md:h-8 text-red-500 fill-red-500 group-hover:scale-90 transition-transform" />
                 </button>
               )}
-              <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">
-                {isRecording ? "Recording Answer..." : isReady ? "Press Play to Record Answer" : "Waiting for Camera..."}
-              </p>
+              {micDenied ? (
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-red-500 text-[10px] md:text-xs font-bold uppercase tracking-widest">
+                    Microphone access denied
+                  </p>
+                  <button
+                    onClick={requestMic}
+                    className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-full hover:bg-indigo-700 transition-colors"
+                  >
+                    Allow Microphone
+                  </button>
+                </div>
+              ) : (
+                <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">
+                  {isRecording ? "Recording Answer..." : isReady ? "Press Play to Record Answer" : "Setting up microphone..."}
+                </p>
+              )}
            </div>
         </div>
       </div>
