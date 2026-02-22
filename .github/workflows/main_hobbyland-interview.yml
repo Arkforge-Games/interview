@@ -36,6 +36,7 @@ jobs:
           tags: n8nhobbylandacr.azurecr.io/interview-app:${{ github.sha }}
           build-args: |
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           file: ./Dockerfile
 
   deploy:

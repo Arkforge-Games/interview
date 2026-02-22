@@ -1,29 +1,30 @@
-
 import { UserProfile } from '../types';
+import { authApi, isAuthenticated, clearTokens } from './api';
 import localforage from 'localforage';
 
 const USER_KEY = 'current_user';
 
 export const getCurrentUser = async (): Promise<UserProfile | null> => {
-  return await localforage.getItem<UserProfile>(USER_KEY);
-};
-
-export const loginUser = async (email: string, name: string): Promise<UserProfile> => {
-  const user: UserProfile = {
-    id: email, // Simple ID for mock
-    email,
-    name,
-    isGuest: false,
-    cvText: ''
-  };
-  // Try to load existing profile to keep CV
-  const existing = await localforage.getItem<UserProfile>(USER_KEY);
-  if (existing && existing.email === email) {
-    user.cvText = existing.cvText;
+  // If we have API tokens, try to get user from backend
+  if (isAuthenticated()) {
+    try {
+      const data = await authApi.me();
+      const user: UserProfile = {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        isGuest: false,
+      };
+      await localforage.setItem(USER_KEY, user);
+      return user;
+    } catch (e) {
+      // Token expired or invalid, fall through
+      clearTokens();
+    }
   }
-  
-  await localforage.setItem(USER_KEY, user);
-  return user;
+
+  // Check for local guest user
+  return await localforage.getItem<UserProfile>(USER_KEY);
 };
 
 export const loginAsGuest = async (): Promise<UserProfile> => {
@@ -39,5 +40,13 @@ export const loginAsGuest = async (): Promise<UserProfile> => {
 };
 
 export const logoutUser = async () => {
+  if (isAuthenticated()) {
+    try {
+      await authApi.logout();
+    } catch (e) {
+      // Ignore logout errors
+    }
+  }
+  clearTokens();
   await localforage.removeItem(USER_KEY);
 };

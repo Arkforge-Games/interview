@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  name        String
+  avatar      String?
+  googleId    String?   @unique
+
+  sessions     Session[]
+  subscription Subscription?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([email])
+  @@index([googleId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token        String   @unique
+  refreshToken String?  @unique
+  expiresAt    DateTime
+
+  userAgent    String?
+  ipAddress    String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([token])
+  @@index([refreshToken])
+}
+
+enum SubscriptionStatus {
+  EXPIRED
+  PAID_TRIAL
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+}
+
+enum PlanInterval {
+  MONTHLY
+  YEARLY
+}
+
+model Subscription {
+  id                    String             @id @default(uuid())
+  userId                String             @unique
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status                SubscriptionStatus @default(EXPIRED)
+  planInterval          PlanInterval?
+
+  stripeCustomerId      String?            @unique
+  stripeSubscriptionId  String?            @unique
+  stripePriceId         String?
+
+  paidTrialStartedAt    DateTime?
+  paidTrialEndsAt       DateTime?
+
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+
+  cancelledAt           DateTime?
+
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([status])
+}
