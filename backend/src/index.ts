@@ -5,11 +5,10 @@ async function main(): Promise<void> {
   // Validate environment variables
   validateEnv();
 
-  // Test database connection
+  // Test database connection (non-fatal — app still serves frontend)
   const dbConnected = await testDatabaseConnection();
   if (!dbConnected) {
-    console.error('Failed to connect to database. Exiting...');
-    process.exit(1);
+    console.warn('Warning: Database not connected. Subscription features will be unavailable.');
   }
 
   // Create Express app
