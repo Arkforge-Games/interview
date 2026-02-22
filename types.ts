@@ -5,7 +5,8 @@ export enum AppStep {
   SETUP = 'SETUP',
   QUESTION_REVIEW = 'QUESTION_REVIEW',
   STAGE = 'STAGE',
-  ANALYSIS = 'ANALYSIS'
+  ANALYSIS = 'ANALYSIS',
+  PRICING = 'PRICING'
 }
 
 export enum SessionMode {
@@ -122,4 +123,15 @@ export interface UserProfile {
   email: string;
   isGuest: boolean;
   cvText?: string;
+}
+
+export interface SubscriptionInfo {
+  status: string;
+  tier: 'free' | 'trial' | 'paid';
+  planInterval: string | null;
+  paidTrialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  canAccessFullFeatures: boolean;
+  requiresUpgrade: boolean;
+  upgradeReason: string | null;
 }

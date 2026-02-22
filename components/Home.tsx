@@ -1,11 +1,13 @@
 
 import React, { useEffect, useState } from 'react';
-import { SessionMode, HistoryItem, UserProfile } from '../types';
+import { SessionMode, HistoryItem, UserProfile, SubscriptionInfo } from '../types';
 import { getHistory, getUserProfile, saveUserProfile } from '../services/historyService';
-import { getCurrentUser, loginUser, loginAsGuest, logoutUser } from '../services/authService';
+import { getCurrentUser, loginAsGuest, logoutUser } from '../services/authService';
 import { extractTextFromFile } from '../services/documentService';
-import { 
-  Play, Briefcase, Target, Award, Calendar, ChevronRight, BookOpen, Star, ShieldCheck, Zap, User, X, FileText, Upload, LogIn, LogOut
+import { GoogleSignIn } from './GoogleSignIn';
+import { SubscriptionBadge } from './SubscriptionBadge';
+import {
+  Play, Briefcase, Target, Award, Calendar, ChevronRight, BookOpen, Star, ShieldCheck, Zap, User, X, FileText, Upload, LogOut
 } from 'lucide-react';
 
 interface Props {
@@ -13,6 +15,9 @@ interface Props {
   onViewHistory: () => void;
   onOpenSettings: () => void;
   onViewSession: (item: HistoryItem) => void;
+  subscriptionInfo: SubscriptionInfo | null;
+  onPricing: () => void;
+  onUserChanged: (user: UserProfile | null) => void;
 }
 
 const FRAMEWORKS = [
@@ -21,23 +26,23 @@ const FRAMEWORKS = [
   { name: "The Rule of Three", desc: "List 3 points to stay structured and memorable.", icon: ShieldCheck, color: "text-emerald-500 bg-emerald-50" }
 ];
 
-export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSession }) => {
+export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSession, subscriptionInfo, onPricing, onUserChanged }) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [stats, setStats] = useState({ total: 0, avg: 0 });
   const [showProfile, setShowProfile] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
   const [cvText, setCvText] = useState("");
   const [savedCv, setSavedCv] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [loginEmail, setLoginEmail] = useState("");
 
   useEffect(() => {
-    // Check auth status, auto-login as guest if no user
     getCurrentUser().then(async (user) => {
       if (!user) {
-        user = await loginAsGuest();
+        // Show login screen instead of auto-guest
+        setCurrentUser(null);
+        return;
       }
       setCurrentUser(user);
+      onUserChanged(user);
       loadUserData(user);
     });
   }, []);
@@ -47,42 +52,31 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
       setCvText(user.cvText);
       setSavedCv(true);
     }
-    
-    // Only load history for logged in users, or if it's guest just show local
+
     if (!user.isGuest) {
       const items = await getHistory();
-      // In a real app, we filter by user.id here. For now, we assume local DB is the user's DB.
-      // But let's pretend we filter:
-      // const userItems = items.filter(i => i.userId === user.id);
       setHistory(items as any);
       if (items.length > 0) {
         const sum = items.reduce((a, b) => a + (b.score || 0), 0);
         setStats({ total: items.length, avg: Math.round(sum / items.length) });
       }
     } else {
-      setHistory([]); // Guests see no history
+      setHistory([]);
       setStats({ total: 0, avg: 0 });
     }
-  };
-
-  const handleLogin = async () => {
-    if (!loginEmail) return;
-    const user = await loginUser(loginEmail, loginEmail.split('@')[0]);
-    setCurrentUser(user);
-    setShowLogin(false);
-    loadUserData(user);
   };
 
   const handleGuest = async () => {
     const user = await loginAsGuest();
     setCurrentUser(user);
-    setShowLogin(false);
+    onUserChanged(user);
     loadUserData(user);
   };
 
   const handleLogout = async () => {
     await logoutUser();
     setCurrentUser(null);
+    onUserChanged(null);
     setHistory([]);
     setStats({ total: 0, avg: 0 });
     setCvText("");
@@ -106,6 +100,7 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
     }
   };
 
+  // Login screen - show when no user
   if (!currentUser) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
@@ -114,18 +109,9 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
                <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">SlayJobs</h1>
                <p className="text-slate-500">AI Mock Interviews & Career Coaching</p>
             </div>
-            
+
             <div className="space-y-4">
-              <input 
-                type="email" 
-                placeholder="Enter email to login/signup" 
-                className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 outline-none focus:border-indigo-500 transition-colors"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-              />
-              <button onClick={handleLogin} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">
-                Continue with Email
-              </button>
+              <GoogleSignIn />
               <div className="relative">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
                 <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-slate-400">or</span></div>
@@ -134,7 +120,7 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
                 Continue as Guest
               </button>
             </div>
-            <p className="text-xs text-slate-400">Guest accounts do not save interview history across devices.</p>
+            <p className="text-xs text-slate-400">Guest: limited to 3 questions, basic report only. Sign in for full access.</p>
          </div>
       </div>
     );
@@ -147,8 +133,11 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Welcome, {currentUser.isGuest ? "Guest" : currentUser.name}</h1>
           <p className="text-slate-500 mt-2 text-lg">Personalized AI coaching tailored to your CV and JD.</p>
         </div>
-        <div className="flex gap-3">
-            <button 
+        <div className="flex gap-3 items-center">
+            {subscriptionInfo && (
+              <SubscriptionBadge subscriptionInfo={subscriptionInfo} onClick={onPricing} />
+            )}
+            <button
               onClick={() => setShowProfile(true)}
               className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm border ${savedCv ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
             >
@@ -170,7 +159,7 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
                 <h2 className="text-4xl font-black leading-tight">Prepare for the <br/>career you deserve.</h2>
               </div>
               <div className="flex gap-4">
-                <button 
+                <button
                   onClick={() => onStartSession(SessionMode.MOCK_INTERVIEW)}
                   className="flex items-center justify-center gap-3 bg-white text-indigo-700 px-8 py-5 rounded-3xl font-black shadow-lg hover:scale-[1.02] transition-transform"
                 >
@@ -204,7 +193,7 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
               {currentUser.isGuest ? (
                  <div className="p-10 border-2 border-dashed border-slate-200 rounded-[2.5rem] text-center text-slate-400">
                     <User size={40} className="mx-auto mb-4 opacity-20" />
-                    Guest history is not saved. <br/> <button onClick={handleLogout} className="text-indigo-600 font-bold underline">Login</button> to track your progress.
+                    Guest history is not saved. <br/> <button onClick={handleLogout} className="text-indigo-600 font-bold underline">Sign in with Google</button> to track your progress.
                  </div>
               ) : history.length === 0 ? (
                 <div className="p-10 border-2 border-dashed border-slate-200 rounded-[2.5rem] text-center text-slate-400">
@@ -274,7 +263,7 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
              <button onClick={() => setShowProfile(false)} className="absolute top-6 right-6 p-2 rounded-full hover:bg-slate-100 text-slate-400">
                <X size={24} />
              </button>
-             
+
              <div className="space-y-6">
                <div className="space-y-2">
                  <h2 className="text-2xl font-black text-slate-900">Your Professional Profile</h2>
@@ -296,7 +285,7 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                    <FileText size={12} /> CV Content / Key Achievements
                  </label>
-                 <textarea 
+                 <textarea
                    value={cvText}
                    onChange={(e) => setCvText(e.target.value)}
                    placeholder="Paste your resume content here..."
@@ -304,7 +293,7 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
                  />
                </div>
 
-               <button 
+               <button
                  onClick={handleSaveProfile}
                  className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-lg"
                >

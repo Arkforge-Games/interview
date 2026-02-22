@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SessionConfig, InterviewQuestion } from '../types';
 import { VirtualAudience } from './VirtualAudience';
-import { Mic, Square, Video, VideoOff, Loader2, Play, ChevronRight, Timer as TimerIcon, Shuffle } from 'lucide-react';
+import { Mic, Square, Video, VideoOff, Loader2, Play, ChevronRight, Timer as TimerIcon, Shuffle, ShieldCheck } from 'lucide-react';
 
 interface Props {
   config: SessionConfig;
@@ -150,9 +150,17 @@ export const Stage: React.FC<Props> = ({ config, onFinishQuestion, onAllFinished
           </div>
         </div>
 
-        <div className="flex items-center gap-3 px-3 py-1.5 md:px-5 md:py-2 bg-slate-50 border border-slate-100 rounded-2xl">
-          <TimerIcon size={16} className="text-indigo-600" />
-          <span className="font-mono font-bold text-base md:text-lg text-slate-700">{formatTime(seconds)}</span>
+        <div className="flex items-center gap-4">
+          {!cameraOn && (
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-700">
+              <ShieldCheck size={14} />
+              <span className="text-[10px] font-bold">Camera off &mdash; we won't record your camera</span>
+            </div>
+          )}
+          <div className="flex items-center gap-3 px-3 py-1.5 md:px-5 md:py-2 bg-slate-50 border border-slate-100 rounded-2xl">
+            <TimerIcon size={16} className="text-indigo-600" />
+            <span className="font-mono font-bold text-base md:text-lg text-slate-700">{formatTime(seconds)}</span>
+          </div>
         </div>
       </div>
 

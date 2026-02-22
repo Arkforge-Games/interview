@@ -17,16 +17,20 @@ interface Props {
     jd: string;
     level: ExperienceLevel;
   };
+  tier?: 'free' | 'trial' | 'paid';
 }
 
 const LANGUAGES = ['English', 'Mandarin', 'Cantonese', 'Spanish', 'French', 'German', 'Japanese', 'Korean'];
 
-export const SessionSetup: React.FC<Props> = ({ onNext, onHome, practiceContext }) => {
+export const SessionSetup: React.FC<Props> = ({ onNext, onHome, practiceContext, tier = 'free' }) => {
+  const isFree = tier === 'free';
+  const maxQuestions = isFree ? 3 : 10;
+
   const [loading, setLoading] = useState(false);
   const [jd, setJd] = useState("");
   const [cvText, setCvText] = useState("");
   const [level, setLevel] = useState<ExperienceLevel>(ExperienceLevel.FRESH_GRAD);
-  const [questionCount, setQuestionCount] = useState(5); 
+  const [questionCount, setQuestionCount] = useState(isFree ? 3 : 5);
   const [language, setLanguage] = useState("English");
   const [focusBalance, setFocusBalance] = useState(50); // 0-100 Slider
   const [cvInputMode, setCvInputMode] = useState<'TEXT' | 'FILE'>('TEXT'); // Default to Text
@@ -334,19 +338,25 @@ export const SessionSetup: React.FC<Props> = ({ onNext, onHome, practiceContext 
                     </h3>
                     <span className="text-indigo-600 font-black text-sm">{questionCount} Questions</span>
                  </div>
-                 <input 
-                    type="range" 
-                    min="3" 
-                    max="10" 
-                    step="1" 
-                    value={questionCount} 
+                 <input
+                    type="range"
+                    min="3"
+                    max={maxQuestions}
+                    step="1"
+                    value={questionCount}
                     onChange={(e) => setQuestionCount(parseInt(e.target.value))}
-                    className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    className={`w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600 ${isFree ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isFree}
                  />
                  <div className="flex justify-between text-[10px] text-slate-400 font-bold mt-2">
                     <span>3 (Short)</span>
-                    <span>10 (Full)</span>
+                    <span>{maxQuestions} (Full)</span>
                  </div>
+                 {isFree && (
+                    <div className="mt-3 bg-amber-50 border border-amber-100 rounded-xl p-3 text-[10px] text-amber-700 font-bold flex items-center gap-2">
+                       <Sparkles size={12} /> Upgrade to Pro for up to 10 questions per session
+                    </div>
+                 )}
             </div>
 
             <button 

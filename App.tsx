@@ -1,13 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppStep, SessionConfig, QuestionAnswer, SessionMode, HistoryItem, ExperienceLevel, UserProfile } from './types';
+import { AppStep, SessionConfig, QuestionAnswer, SessionMode, HistoryItem, ExperienceLevel, UserProfile, SubscriptionInfo } from './types';
 import { SessionSetup } from './components/SessionSetup';
 import { Stage } from './components/Stage';
 import { Analysis } from './components/Analysis';
 import { Home } from './components/Home';
+import { PricingPage } from './components/PricingPage';
+import { UpgradePrompt } from './components/UpgradePrompt';
 import { analyzeAnswer } from './services/geminiService';
 import { saveHistoryItem } from './services/historyService';
 import { getCurrentUser } from './services/authService';
+import { isAuthenticated, setTokens, subscriptionApi } from './services/api';
 import { Loader2, Sparkles } from 'lucide-react';
 
 export default function App() {
@@ -18,13 +21,85 @@ export default function App() {
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [practiceContext, setPracticeContext] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
+  const goToSubscription = () => {
+    if (window.location.pathname === '/subscription') return;
+    window.location.href = '/subscription';
+  };
+
+  // Handle OAuth callback, subscription return, and URL routing
   useEffect(() => {
-    getCurrentUser().then(setCurrentUser);
+    const params = new URLSearchParams(window.location.search);
+    const accessTokenParam = params.get('accessToken');
+    const refreshTokenParam = params.get('refreshToken');
+    const subscriptionParam = params.get('subscription');
+
+    // Detect /subscription URL
+    if (window.location.pathname === '/subscription') {
+      setStep(AppStep.PRICING);
+    }
+
+    if (accessTokenParam && refreshTokenParam) {
+      // OAuth callback - store tokens
+      setTokens(accessTokenParam, refreshTokenParam);
+      window.history.replaceState({}, '', window.location.pathname);
+
+      // Load user and subscription
+      getCurrentUser().then(user => {
+        setCurrentUser(user);
+        if (user && !user.isGuest) {
+          loadSubscription();
+        }
+      });
+    } else if (subscriptionParam === 'success') {
+      window.history.replaceState({}, '', '/');
+      // Reload subscription after successful checkout
+      loadSubscription().then(() => {
+        window.location.href = '/';
+      });
+    } else {
+      // Normal load
+      getCurrentUser().then(user => {
+        setCurrentUser(user);
+        if (user && !user.isGuest && isAuthenticated()) {
+          loadSubscription();
+        }
+      });
+    }
   }, []);
 
+  // Handle /auth/callback path (SPA fallback)
+  useEffect(() => {
+    if (window.location.pathname === '/auth/callback') {
+      const params = new URLSearchParams(window.location.search);
+      const accessTokenParam = params.get('accessToken');
+      const refreshTokenParam = params.get('refreshToken');
+      if (accessTokenParam && refreshTokenParam) {
+        setTokens(accessTokenParam, refreshTokenParam);
+        window.history.replaceState({}, '', '/');
+        getCurrentUser().then(user => {
+          setCurrentUser(user);
+          if (user && !user.isGuest) {
+            loadSubscription();
+          }
+        });
+      }
+    }
+  }, []);
+
+  const loadSubscription = async () => {
+    try {
+      const info = await subscriptionApi.getStatus();
+      setSubscriptionInfo(info);
+    } catch (e) {
+      console.error('Failed to load subscription:', e);
+    }
+  };
+
   const handleStartSession = (mode?: SessionMode) => {
-    setPracticeContext(null); // Clear previous practice context
+    setPracticeContext(null);
     setStep(AppStep.SETUP);
   };
 
@@ -56,7 +131,7 @@ export default function App() {
           duration: finalDuration || 0
        };
        finalAnswers = [...finalAnswers, lastAnswer];
-       setAnswers(finalAnswers); // Update state for UI consistency
+       setAnswers(finalAnswers);
     }
     processAnalysis(finalAnswers);
   };
@@ -65,7 +140,7 @@ export default function App() {
     if (!sessionConfig) return;
     setIsAnalyzing(true);
     setAnalysisProgress(0);
-    
+
     const analyzedAnswers: QuestionAnswer[] = [];
     for (let i = 0; i < answersToAnalyze.length; i++) {
       setAnalysisProgress(Math.round(((i) / answersToAnalyze.length) * 100));
@@ -80,11 +155,10 @@ export default function App() {
       );
       analyzedAnswers.push({ ...answersToAnalyze[i], analysis: res });
     }
-    
+
     setAnalysisProgress(100);
     const avgScore = Math.round(analyzedAnswers.reduce((a, b) => a + (b.analysis?.overallScore || 0), 0) / analyzedAnswers.length);
-    
-    // Refresh user state to ensure we have latest info before saving
+
     const user = await getCurrentUser();
 
     if (user && !user.isGuest) {
@@ -98,7 +172,7 @@ export default function App() {
       };
       await saveHistoryItem(historyItem as any);
     }
-    
+
     setAnswers(analyzedAnswers);
     setIsAnalyzing(false);
     setStep(AppStep.ANALYSIS);
@@ -106,10 +180,10 @@ export default function App() {
 
   const handlePracticeWeakness = (weakAnswers: QuestionAnswer[]) => {
     if (!sessionConfig) return;
-    
+
     const summary = weakAnswers.map(a => `Question: "${a.questionText}" -> Score: ${a.analysis?.overallScore}. Critique: ${a.analysis?.expertCritique}`).join('\n');
     const excluded = answers.map(a => a.questionText);
-    
+
     setPracticeContext({
       weaknesses: summary,
       excludedQuestions: excluded,
@@ -117,44 +191,79 @@ export default function App() {
       jd: sessionConfig.jobDescription,
       level: sessionConfig.experienceLevel
     });
-    
+
     setStep(AppStep.SETUP);
   };
 
+  // Determine tier for feature gating
+  const tier = subscriptionInfo?.tier || 'free';
+  const isGuest = currentUser?.isGuest ?? true;
+
   return (
     <div className="min-h-screen bg-slate-50">
-      {step === AppStep.HOME && <Home 
-        onStartSession={handleStartSession} 
-        onViewHistory={() => {}} 
-        onOpenSettings={() => {}} 
+      {step === AppStep.HOME && <Home
+        onStartSession={handleStartSession}
+        onViewHistory={() => {}}
+        onOpenSettings={() => {}}
         onViewSession={(item) => {
           setAnswers(item.results);
           setSessionConfig({ jobTitle: item.jobTitle } as any);
           setStep(AppStep.ANALYSIS);
-        }} 
+        }}
+        subscriptionInfo={subscriptionInfo}
+        onPricing={goToSubscription}
+        onUserChanged={(user) => {
+          setCurrentUser(user);
+          if (user && !user.isGuest && isAuthenticated()) {
+            loadSubscription();
+          } else {
+            setSubscriptionInfo(null);
+          }
+        }}
       />}
       {step === AppStep.SETUP && (
-        <SessionSetup 
-          onNext={handleSetupComplete} 
-          onHome={() => setStep(AppStep.HOME)} 
+        <SessionSetup
+          onNext={handleSetupComplete}
+          onHome={() => setStep(AppStep.HOME)}
           practiceContext={practiceContext}
+          tier={tier}
         />
       )}
       {step === AppStep.STAGE && sessionConfig && (
-        <Stage 
-          config={sessionConfig} 
-          onFinishQuestion={handleFinishQuestion} 
-          onAllFinished={handleAllFinished} 
+        <Stage
+          config={sessionConfig}
+          onFinishQuestion={handleFinishQuestion}
+          onAllFinished={handleAllFinished}
         />
       )}
       {step === AppStep.ANALYSIS && sessionConfig && (
-        <Analysis 
+        <Analysis
           result={{
             overallScore: Math.round(answers.reduce((a, b) => a + (b.analysis?.overallScore || 0), 0) / answers.length)
           }}
           results={answers}
           onHome={() => setStep(AppStep.HOME)}
           onPracticeWeakness={handlePracticeWeakness}
+          tier={tier}
+          onUpgrade={goToSubscription}
+        />
+      )}
+      {step === AppStep.PRICING && (
+        <PricingPage
+          onBack={() => { window.location.href = '/'; }}
+          subscriptionInfo={subscriptionInfo}
+          lockMode={subscriptionInfo?.requiresUpgrade && isAuthenticated()}
+        />
+      )}
+
+      {showUpgradePrompt && step !== AppStep.PRICING && subscriptionInfo?.upgradeReason && (
+        <UpgradePrompt
+          reason={subscriptionInfo.upgradeReason}
+          onUpgrade={() => {
+            setShowUpgradePrompt(false);
+            goToSubscription();
+          }}
+          onDismiss={() => setShowUpgradePrompt(false)}
         />
       )}
 
