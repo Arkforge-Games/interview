@@ -41,52 +41,43 @@ export default function App() {
       setStep(AppStep.PRICING);
     }
 
+    // OAuth callback — tokens in URL (from /auth/callback or any path)
     if (accessTokenParam && refreshTokenParam) {
-      // OAuth callback - store tokens
       setTokens(accessTokenParam, refreshTokenParam);
-      window.history.replaceState({}, '', window.location.pathname);
+      // Always redirect to home after storing tokens
+      window.history.replaceState({}, '', '/');
 
-      // Load user and subscription
       getCurrentUser().then(user => {
         setCurrentUser(user);
         if (user && !user.isGuest) {
           loadSubscription();
         }
       });
-    } else if (subscriptionParam === 'success') {
+      return;
+    }
+
+    // Subscription success return
+    if (subscriptionParam === 'success') {
       window.history.replaceState({}, '', '/');
-      // Reload subscription after successful checkout
       loadSubscription().then(() => {
         window.location.href = '/';
       });
-    } else {
-      // Normal load
-      getCurrentUser().then(user => {
-        setCurrentUser(user);
-        if (user && !user.isGuest && isAuthenticated()) {
-          loadSubscription();
-        }
-      });
+      return;
     }
-  }, []);
 
-  // Handle /auth/callback path (SPA fallback)
-  useEffect(() => {
+    // If stuck on /auth/callback without tokens, redirect home
     if (window.location.pathname === '/auth/callback') {
-      const params = new URLSearchParams(window.location.search);
-      const accessTokenParam = params.get('accessToken');
-      const refreshTokenParam = params.get('refreshToken');
-      if (accessTokenParam && refreshTokenParam) {
-        setTokens(accessTokenParam, refreshTokenParam);
-        window.history.replaceState({}, '', '/');
-        getCurrentUser().then(user => {
-          setCurrentUser(user);
-          if (user && !user.isGuest) {
-            loadSubscription();
-          }
-        });
-      }
+      window.location.href = '/';
+      return;
     }
+
+    // Normal load
+    getCurrentUser().then(user => {
+      setCurrentUser(user);
+      if (user && !user.isGuest && isAuthenticated()) {
+        loadSubscription();
+      }
+    });
   }, []);
 
   const loadSubscription = async () => {
