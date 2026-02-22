@@ -11,19 +11,19 @@ import { env } from './config/environment';
 export function createApp(): Application {
   const app = express();
 
-  // Security middleware
+  // Security middleware — CSP must allow all CDN scripts used by the frontend
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com", "https://apis.google.com"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://fonts.googleapis.com"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://cdnjs.cloudflare.com", "https://aistudiocdn.com", "https://accounts.google.com", "https://apis.google.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://accounts.google.com", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         imgSrc: ["'self'", "data:", "https:", "blob:"],
         connectSrc: ["'self'", "https://accounts.google.com", "https://generativelanguage.googleapis.com", "https://checkout.stripe.com", "https://api.stripe.com"],
         frameSrc: ["'self'", "https://accounts.google.com", "https://checkout.stripe.com", "https://js.stripe.com"],
         mediaSrc: ["'self'", "blob:"],
-        workerSrc: ["'self'", "blob:"],
+        workerSrc: ["'self'", "blob:", "https://cdnjs.cloudflare.com"],
       },
     },
   }));
