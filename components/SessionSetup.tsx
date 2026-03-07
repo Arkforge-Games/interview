@@ -59,22 +59,22 @@ export const SessionSetup: React.FC<Props> = ({ onNext, onHome, practiceContext,
 
     setLoading(true);
     try {
-      const rawQuestions = await generateInterviewQuestions(
-        "The Role described in JD", 
-        jdVal, 
-        cvText, 
-        level || practiceContext?.level, 
-        "N/A", 
+      const result = await generateInterviewQuestions(
+        "The Role described in JD",
+        jdVal,
+        cvText,
+        level || practiceContext?.level,
+        "N/A",
         language,
         focusBalance,
         practiceContext?.weaknesses,
         practiceContext?.excludedQuestions
       );
 
-      const { selected, backup } = balanceQuestions(rawQuestions, questionCount);
+      const { selected, backup } = balanceQuestions(result.questions, questionCount);
 
       onNext({
-        jobTitle: "Target Role", 
+        jobTitle: result.jobTitle,
         companyName: "",
         yearsOfExperience: "",
         jobDescription: jdVal,
@@ -322,11 +322,11 @@ export const SessionSetup: React.FC<Props> = ({ onNext, onHome, practiceContext,
                     <span>Technical</span>
                  </div>
                  <div className="mt-3 bg-slate-50 p-3 rounded-lg text-[10px] text-slate-500 leading-snug italic">
-                    {focusBalance < 30 
-                       ? "Questions will focus on culture fit, soft skills, and personality."
-                       : focusBalance > 70 
-                       ? "Heavy focus on hard skills, technical scenarios, and problem solving."
-                       : "A standard interview mix of behavioral and technical questions."
+                    {focusBalance < 30
+                       ? "More culture fit and soft skills, but still includes work scenarios to solve."
+                       : focusBalance > 70
+                       ? "Heavy focus on technical problem-solving, work scenarios, and matching your experience to company needs."
+                       : "A balanced mix of technical scenarios, experience-matching, and behavioral questions."
                     }
                  </div>
             </div>

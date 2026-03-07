@@ -1,13 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { SessionMode, HistoryItem, UserProfile, SubscriptionInfo } from '../types';
-import { getHistory, getUserProfile, saveUserProfile } from '../services/historyService';
-import { getCurrentUser, loginAsGuest, logoutUser } from '../services/authService';
-import { extractTextFromFile } from '../services/documentService';
+import { getHistory } from '../services/historyService';
 import { GoogleSignIn } from './GoogleSignIn';
 import { SubscriptionBadge } from './SubscriptionBadge';
 import {
-  Play, Briefcase, Target, Award, Calendar, ChevronRight, BookOpen, Star, ShieldCheck, Zap, User, X, FileText, Upload, LogOut
+  Play, Briefcase, Target, Award, Calendar, ChevronRight, BookOpen, Star, ShieldCheck, Zap, User
 } from 'lucide-react';
 
 interface Props {
@@ -17,7 +15,9 @@ interface Props {
   onViewSession: (item: HistoryItem) => void;
   subscriptionInfo: SubscriptionInfo | null;
   onPricing: () => void;
+  onProfile: () => void;
   onUserChanged: (user: UserProfile | null) => void;
+  user: UserProfile | null;
 }
 
 const FRAMEWORKS = [
@@ -26,33 +26,20 @@ const FRAMEWORKS = [
   { name: "The Rule of Three", desc: "List 3 points to stay structured and memorable.", icon: ShieldCheck, color: "text-emerald-500 bg-emerald-50" }
 ];
 
-export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSession, subscriptionInfo, onPricing, onUserChanged }) => {
+export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSession, subscriptionInfo, onPricing, onProfile, onUserChanged, user: userProp }) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [stats, setStats] = useState({ total: 0, avg: 0 });
-  const [showProfile, setShowProfile] = useState(false);
-  const [cvText, setCvText] = useState("");
-  const [savedCv, setSavedCv] = useState(false);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(userProp);
 
+  // Sync with parent user prop and load data when user changes
   useEffect(() => {
-    getCurrentUser().then(async (user) => {
-      if (!user) {
-        // Show login screen instead of auto-guest
-        setCurrentUser(null);
-        return;
-      }
-      setCurrentUser(user);
-      onUserChanged(user);
-      loadUserData(user);
-    });
-  }, []);
+    if (userProp) {
+      setCurrentUser(userProp);
+      loadUserData(userProp);
+    }
+  }, [userProp?.id, userProp?.isGuest]);
 
   const loadUserData = async (user: UserProfile) => {
-    if (user.cvText) {
-      setCvText(user.cvText);
-      setSavedCv(true);
-    }
-
     if (!user.isGuest) {
       const items = await getHistory();
       setHistory(items as any);
@@ -66,62 +53,11 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
     }
   };
 
-  const handleGuest = async () => {
-    const user = await loginAsGuest();
-    setCurrentUser(user);
-    onUserChanged(user);
-    loadUserData(user);
-  };
-
-  const handleLogout = async () => {
-    await logoutUser();
-    setCurrentUser(null);
-    onUserChanged(null);
-    setHistory([]);
-    setStats({ total: 0, avg: 0 });
-    setCvText("");
-    setSavedCv(false);
-  };
-
-  const handleSaveProfile = async () => {
-    await saveUserProfile(cvText);
-    setSavedCv(true);
-    setShowProfile(false);
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-        const text = await extractTextFromFile(file);
-        setCvText(text);
-    } catch (e) {
-        alert("Failed to read file. Please copy/paste text instead.");
-    }
-  };
-
-  // Login screen - show when no user
+  // Loading state - show spinner while auto-guest login happens
   if (!currentUser) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
-         <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl space-y-8 text-center animate-fade-in">
-            <div>
-               <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">SlayJobs</h1>
-               <p className="text-slate-500">AI Mock Interviews & Career Coaching</p>
-            </div>
-
-            <div className="space-y-4">
-              <GoogleSignIn />
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-                <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-slate-400">or</span></div>
-              </div>
-              <button onClick={handleGuest} className="w-full py-4 bg-white border border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50 transition-colors">
-                Continue as Guest
-              </button>
-            </div>
-            <p className="text-xs text-slate-400">Guest: limited to 3 questions, basic report only. Sign in for full access.</p>
-         </div>
+        <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full"></div>
       </div>
     );
   }
@@ -137,16 +73,21 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
             {subscriptionInfo && (
               <SubscriptionBadge subscriptionInfo={subscriptionInfo} onClick={onPricing} />
             )}
-            <button
-              onClick={() => setShowProfile(true)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold transition-all shadow-sm border ${savedCv ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-            >
-              <User size={20} />
-              {savedCv ? "Edit Profile" : "Upload CV"}
-            </button>
-            <button onClick={handleLogout} className="p-3 bg-white border border-slate-200 text-slate-400 rounded-2xl hover:text-red-500 hover:bg-red-50 transition-colors">
-               <LogOut size={20} />
-            </button>
+            {currentUser.isGuest ? (
+              <GoogleSignIn compact />
+            ) : (
+              <button
+                onClick={onProfile}
+                className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors"
+                title="Profile"
+              >
+                {currentUser.avatar ? (
+                  <img src={currentUser.avatar} alt="" className="w-6 h-6 rounded-full" />
+                ) : (
+                  <User size={20} className="text-slate-500" />
+                )}
+              </button>
+            )}
         </div>
       </div>
 
@@ -191,9 +132,11 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
             </div>
             <div className="space-y-4">
               {currentUser.isGuest ? (
-                 <div className="p-10 border-2 border-dashed border-slate-200 rounded-[2.5rem] text-center text-slate-400">
-                    <User size={40} className="mx-auto mb-4 opacity-20" />
-                    Guest history is not saved. <br/> <button onClick={handleLogout} className="text-indigo-600 font-bold underline">Sign in with Google</button> to track your progress.
+                 <div className="p-10 border-2 border-dashed border-slate-200 rounded-[2.5rem] text-center text-slate-400 flex flex-col items-center gap-4">
+                    <User size={40} className="opacity-20" />
+                    <p>Guest history is not saved.</p>
+                    <GoogleSignIn compact />
+                    <p className="text-xs">Sign in to track your progress.</p>
                  </div>
               ) : history.length === 0 ? (
                 <div className="p-10 border-2 border-dashed border-slate-200 rounded-[2.5rem] text-center text-slate-400">
@@ -256,53 +199,6 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
         </div>
       </div>
 
-      {/* Profile Modal */}
-      {showProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-[2rem] w-full max-w-2xl p-8 shadow-2xl border border-slate-100 relative">
-             <button onClick={() => setShowProfile(false)} className="absolute top-6 right-6 p-2 rounded-full hover:bg-slate-100 text-slate-400">
-               <X size={24} />
-             </button>
-
-             <div className="space-y-6">
-               <div className="space-y-2">
-                 <h2 className="text-2xl font-black text-slate-900">Your Professional Profile</h2>
-                 <p className="text-slate-500">Upload your CV to personalize all future interview sessions.</p>
-               </div>
-
-               <div className="p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 transition-colors text-center group">
-                  <input type="file" accept=".txt,.pdf,.docx,.doc" onChange={handleFileUpload} className="hidden" id="cv-upload" />
-                  <label htmlFor="cv-upload" className="cursor-pointer block">
-                    <div className="w-12 h-12 rounded-full bg-white text-indigo-600 mx-auto mb-3 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                      <Upload size={20} />
-                    </div>
-                    <p className="text-sm font-bold text-slate-700">Click to upload or Drag & Drop</p>
-                    <p className="text-xs text-slate-400 mt-1">PDF, DOCX, TXT supported</p>
-                  </label>
-               </div>
-
-               <div className="space-y-2">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                   <FileText size={12} /> CV Content / Key Achievements
-                 </label>
-                 <textarea
-                   value={cvText}
-                   onChange={(e) => setCvText(e.target.value)}
-                   placeholder="Paste your resume content here..."
-                   className="w-full h-64 bg-white border border-slate-200 rounded-2xl p-4 text-sm leading-relaxed text-slate-600 focus:border-indigo-600 outline-none resize-none"
-                 />
-               </div>
-
-               <button
-                 onClick={handleSaveProfile}
-                 className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-lg"
-               >
-                 Save Profile
-               </button>
-             </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
