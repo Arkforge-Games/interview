@@ -40,34 +40,35 @@ async function callWithRetry<T>(fn: () => Promise<T>, retries = 2, delay = 2000)
   }
 }
 
+export interface GeneratedQuestions {
+  jobTitle: string;
+  questions: InterviewQuestion[];
+}
+
 export const generateInterviewQuestions = async (
-  jobTitle: string, 
+  jobTitle: string,
   jd: string,
   cv: string,
   level: ExperienceLevel,
   years: string,
   language: string,
-  focusBalance: number, 
+  focusBalance: number,
   weaknessContext?: string,
   excludedQuestions?: string[]
-): Promise<InterviewQuestion[]> => {
+): Promise<GeneratedQuestions> => {
   
-  let techCount = 3;
-  let expCount = 4;
-  let introCount = 3;
+  // Distribution heavily weighted toward technical & scenario questions
+  let techCount: number, scenarioCount: number, expCount: number, introCount: number;
 
   if (focusBalance > 70) {
-    techCount = 7;
-    expCount = 2;
-    introCount = 1;
+    // Technical focus: almost entirely hard skills
+    techCount = 5; scenarioCount = 3; expCount = 2; introCount = 0;
   } else if (focusBalance < 30) {
-    techCount = 1;
-    expCount = 3;
-    introCount = 6;
+    // Behavioral focus: still has technical, just less
+    techCount = 2; scenarioCount = 3; expCount = 2; introCount = 3;
   } else {
-    techCount = 4;
-    expCount = 4;
-    introCount = 2;
+    // Balanced DEFAULT: still mostly technical
+    techCount = 4; scenarioCount = 3; expCount = 2; introCount = 1;
   }
 
   let instruction = `Task: Generate EXACTLY 10 interview questions in ${language} for the position described in the Job Description below (${level}, ${years} years exp).`;
@@ -85,25 +86,39 @@ export const generateInterviewQuestions = async (
     Context (CV): ${cv.slice(0, 2000)}
     Output Language: ${language}
     Technical Focus Balance: ${focusBalance}/100 (Where 0 is Purely Behavioral, 100 is Purely Technical).
-    
-    CRITICAL CONSTRAINTS:
-    1. LENGTH: Every question must be between 17 and 25 words. Concise, punchy, and professional.
-    2. STYLE: Direct questions ONLY. Do NOT use preambles like "Given your experience at Company X..." or "I see you did Y...". Just ask the question immediately.
-    3. FOCUS: Do NOT praise or recognize past achievements in the question text. The candidate knows their own history. Focus strictly on how they will apply skills to the NEW role.
-    4. PRACTICAL SCENARIOS ONLY: ALL questions must be grounded in realistic, task-related scenarios derived from the JD.
-       - DO NOT ask theoretical or generic questions like "Tell me about a time you used Java", "What is your greatest strength?", or "What do you know about X concept?".
-       - EVERY question should present a specific workplace situation, task, or problem that the candidate would actually face in this role.
-       - For Technical: Present a concrete problem to solve (e.g., "Our trading system has high latency during market open. How would you profile and optimize the Java garbage collection?").
-       - For Experience: Frame as a practical challenge (e.g., "A key stakeholder rejects your proposed architecture mid-sprint. Walk me through how you handle this.").
-       - For Behavioral/Intro: Use realistic workplace dilemmas (e.g., "Two senior engineers on your team disagree on the database migration approach. How do you resolve it and keep the project on track?").
 
-    DISTRIBUTION REQUIREMENTS (Total 10 Questions):
-    1. ${introCount} questions: "Intro/General/Behavioral" (Culture fit, Soft skills — framed as practical workplace scenarios).
-    2. ${expCount} questions: "Experience Application" (Applying past work to new practical problems).
-    3. ${techCount} questions: "Technical/Scenario" (Specific problem-solving tasks based on the JD).
+    === HARD RULES ===
+    1. LENGTH: Every question must be between 17 and 35 words.
+    2. STYLE: Direct questions ONLY. No preambles like "Given your experience at..." or "I see you did...". Jump straight into the problem.
+    3. NO SOFT QUESTIONS IN TECHNICAL/SCENARIO/EXPERIENCE CATEGORIES: Questions about "communication", "negotiation", "conflict resolution", "stakeholder management", "team dynamics", or "culture fit" are ONLY allowed in the Intro category. Technical, Scenario, and Experience questions must be about HARD SKILLS — actual work output, tools, systems, architecture, code, processes, or domain expertise.
 
-    Output JSON format: [{"text": string, "category": string}]
-    Category must be one of: "Intro", "Experience", "Technical", "Behavioral".`;
+    === WHAT "TECHNICAL" MEANS (BE STRICT) ===
+    Technical questions must require DOMAIN KNOWLEDGE to answer. The candidate must demonstrate they know HOW to do the actual work, not how to talk about it.
+    GOOD Technical examples:
+    - "Our PostgreSQL queries slow to 8 seconds under load. Walk me through your diagnosis and optimization approach."
+    - "Design a caching strategy for our product catalog API that serves 50K concurrent users."
+    - "Our React app bundle is 4MB. What specific techniques would you use to reduce it below 1MB?"
+    - "Write a data pipeline that ingests CSV uploads, validates schemas, and loads into our warehouse. What tools and approach?"
+    BAD (these are NOT technical, do NOT generate these):
+    - "A product owner demands a feature that compromises security. How do you communicate the risks?" ← This is COMMUNICATION, not technical
+    - "How do you ensure code quality across the team?" ← This is PROCESS/MANAGEMENT, not technical
+    - "A stakeholder disagrees with your technical approach. How do you handle it?" ← This is NEGOTIATION, not technical
+
+    === CATEGORY DEFINITIONS ===
+    "Technical" = Hard problems requiring domain expertise. The candidate must explain a technical solution: debugging, architecture, system design, code, tooling, data modeling, infrastructure, algorithms, performance optimization, security implementation.
+    "Scenario" = Give the candidate a realistic WORK TASK to complete. Not interpersonal — an actual deliverable or technical challenge: "Build X", "Debug Y", "Migrate from A to B", "A production incident happens — what are your exact steps?", "Design the data model for feature X".
+    "Experience" = Bridge CV-to-JD: "Your CV shows experience with X. Our stack uses Y. How would you apply your knowledge to solve [specific technical problem from JD]?"
+    "Intro" = The ONLY category for soft skills, culture, communication, leadership style, motivation. Keep to minimum.
+
+    === DISTRIBUTION (Total 10 Questions) ===
+    1. ${techCount} questions: "Technical"
+    2. ${scenarioCount} questions: "Scenario"
+    3. ${expCount} questions: "Experience"
+    4. ${introCount} questions: "Intro"
+
+    Output JSON format: {"jobTitle": string, "questions": [{"text": string, "category": string}]}
+    "jobTitle": Extract the exact job title / role name from the JD (e.g. "Senior Product Manager", "Full Stack Developer"). Keep it short (1-5 words). If unclear, use "General Interview".
+    Category must be one of: "Intro", "Experience", "Technical", "Scenario".`;
 
   try {
     const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
@@ -112,12 +127,18 @@ export const generateInterviewQuestions = async (
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              text: { type: Type.STRING },
-              category: { type: Type.STRING }
+          type: Type.OBJECT,
+          properties: {
+            jobTitle: { type: Type.STRING },
+            questions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  text: { type: Type.STRING },
+                  category: { type: Type.STRING }
+                }
+              }
             }
           }
         }
@@ -125,22 +146,29 @@ export const generateInterviewQuestions = async (
     }));
 
     const raw = parseModelJson(response.text);
-    const questions = Array.isArray(raw) ? raw : [];
-    return questions.map((q: any, i: number) => ({
-      id: `q-${i}-${Date.now()}`, 
-      text: q.text || "Question text unavailable",
-      category: q.category || "General"
-    }));
+    const questions = Array.isArray(raw.questions) ? raw.questions : (Array.isArray(raw) ? raw : []);
+    const extractedTitle = raw.jobTitle || "General Interview";
+    return {
+      jobTitle: extractedTitle,
+      questions: questions.map((q: any, i: number) => ({
+        id: `q-${i}-${Date.now()}`,
+        text: q.text || "Question text unavailable",
+        category: q.category || "General"
+      })),
+    };
   } catch (error) {
     console.error("Failed to generate questions after retries:", error);
     // Fallback questions to unblock user
-    return [
+    return {
+      jobTitle: jobTitle || "General Interview",
+      questions: [
         { id: 'err-1', text: "Could you tell me about yourself and why you applied for this role?", category: 'Intro' },
         { id: 'err-2', text: "What is your greatest professional strength and how does it apply here?", category: 'Intro' },
         { id: 'err-3', text: "Describe a challenging technical problem you solved recently.", category: 'Technical' },
         { id: 'err-4', text: "How do you handle conflict with a coworker?", category: 'Behavioral' },
         { id: 'err-5', text: "Where do you see yourself in five years?", category: 'Experience' }
-    ];
+      ],
+    };
   }
 };
 
@@ -179,7 +207,8 @@ export const analyzeAnswer = async (
     4. demoLogicRoadmap: A 3-5 step sequence of the ideal logic flow in ${language}.
     5. logicUpgrades: Specific tips in ${language}.
     6. answerFramework: SUGGEST A FRAMEWORK.
-       - If Technical/Scenario: Suggest specific structure (e.g. "Problem-Solution-Impact", "Concept-Application-Tradeoffs").
+       - If Technical: Suggest specific structure (e.g. "Problem-Solution-Impact", "Concept-Application-Tradeoffs").
+       - If Scenario (work situation): Suggest "SCORE" (Situation, Constraints, Options, Response, Evaluation) or "Incident Response" framework.
        - If Behavioral: Suggest "STAR Method" (Situation, Task, Action, Result).
        - If General: Suggest "PREP" (Point, Reason, Example, Point).
        Provide the name, explanation, and concrete steps applied to this specific question context in ${language}.
