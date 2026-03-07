@@ -13,9 +13,11 @@ model User {
   name        String
   avatar      String?
   googleId    String?   @unique
+  cvText      String?   @db.Text
 
-  sessions     Session[]
-  subscription Subscription?
+  sessions           Session[]
+  subscription       Subscription?
+  interviewSessions  InterviewSession[]
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -83,4 +85,65 @@ model Subscription {
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
   @@index([status])
+}
+
+enum QuestionCategory {
+  INTRO
+  EXPERIENCE
+  BEHAVIORAL
+  TECHNICAL
+  SCENARIO
+}
+
+model InterviewSession {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  jobTitle         String
+  jobDescription   String?  @db.Text
+  cvText           String?  @db.Text
+  experienceLevel  String?
+  language         String?  @default("English")
+  focusBalance     Int?
+  questionCount    Int?
+  aggregateScore   Int
+
+  answers          InterviewAnswer[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+model InterviewAnswer {
+  id                  String   @id @default(uuid())
+  interviewSessionId  String
+  interviewSession    InterviewSession @relation(fields: [interviewSessionId], references: [id], onDelete: Cascade)
+
+  questionIndex       Int
+  questionText        String   @db.Text
+  category            QuestionCategory?
+
+  duration            Int?
+  transcript          String?  @db.Text
+
+  overallScore        Int?
+  logicScore          Int?
+  concisenessScore    Int?
+  precisionScore      Int?
+
+  expertCritique      String?  @db.Text
+  demoAnswer          String?  @db.Text
+  ceoDemoAnswer       String?  @db.Text
+  demoLogicRoadmap    Json?
+  answerFramework     Json?
+  logicUpgrades       Json?
+
+  createdAt           DateTime @default(now())
+
+  @@index([interviewSessionId])
 }
