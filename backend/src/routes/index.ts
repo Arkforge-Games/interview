@@ -3,6 +3,7 @@ import healthRoutes from './health.routes';
 import authRoutes from './auth.routes';
 import subscriptionRoutes from './subscription.routes';
 import stripeRoutes from './stripe.routes';
+import interviewRoutes from './interview.routes';
 
 const router = Router();
 
@@ -17,5 +18,8 @@ router.use('/subscription', subscriptionRoutes);
 
 // Stripe webhook routes
 router.use('/stripe', stripeRoutes);
+
+// Interview routes
+router.use('/interviews', interviewRoutes);
 
 export default router;

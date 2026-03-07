@@ -6,6 +6,7 @@ export interface CreateUserData {
   name: string;
   avatar?: string;
   googleId?: string;
+  cvText?: string;
 }
 
 export interface CreateSessionData {
