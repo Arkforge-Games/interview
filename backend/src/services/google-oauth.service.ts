@@ -2,14 +2,24 @@ import { OAuth2Client, TokenPayload } from 'google-auth-library';
 import { env } from '../config/environment';
 
 const FRONTEND_URL = env.FRONTEND_URL;
-const BACKEND_URL = env.isProduction
-  ? env.FRONTEND_URL
-  : `http://localhost:${env.PORT}`;
+
+// Allowed origins for post-login redirect (prevent open redirect)
+const ALLOWED_ORIGINS = [
+  'https://slayjobs.com',
+  'https://www.slayjobs.com',
+  'https://hobbyland-interview.azurewebsites.net',
+  'http://localhost:3000',
+];
+
+// Google OAuth callback must use the URI registered in Google Cloud Console.
+// GOOGLE_REDIRECT_URI env var allows overriding; defaults to FRONTEND_URL.
+const GOOGLE_CALLBACK_URI = process.env.GOOGLE_REDIRECT_URI
+  || (env.isProduction ? `${env.FRONTEND_URL}/api/v1/auth/google/callback` : `http://localhost:${env.PORT}/api/v1/auth/google/callback`);
 
 const client = new OAuth2Client(
   env.GOOGLE_CLIENT_ID,
   env.GOOGLE_CLIENT_SECRET,
-  `${BACKEND_URL}/api/v1/auth/google/callback`
+  GOOGLE_CALLBACK_URI
 );
 
 export interface GoogleUserInfo {
@@ -21,17 +31,24 @@ export interface GoogleUserInfo {
 
 export const googleOAuthService = {
   // Generate OAuth URL for Google Sign-In
-  getAuthUrl(): string {
+  // returnOrigin: the frontend origin to redirect back to after login
+  getAuthUrl(returnOrigin?: string): string {
     const scopes = [
       'openid',
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
     ];
 
+    // Encode the return origin in OAuth state parameter
+    const state = returnOrigin && ALLOWED_ORIGINS.includes(returnOrigin)
+      ? returnOrigin
+      : FRONTEND_URL;
+
     return client.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
       prompt: 'consent',
+      state,
     });
   },
 
@@ -84,13 +101,15 @@ export const googleOAuthService = {
     };
   },
 
-  // Get frontend callback URL
-  getFrontendCallbackUrl(accessToken: string, refreshToken: string): string {
-    return `${FRONTEND_URL}/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`;
+  // Get frontend callback URL (uses returnOrigin if provided and allowed)
+  getFrontendCallbackUrl(accessToken: string, refreshToken: string, returnOrigin?: string): string {
+    const base = returnOrigin && ALLOWED_ORIGINS.includes(returnOrigin) ? returnOrigin : FRONTEND_URL;
+    return `${base}/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`;
   },
 
-  // Get frontend error URL
-  getFrontendErrorUrl(error: string): string {
-    return `${FRONTEND_URL}/auth/error?error=${encodeURIComponent(error)}`;
+  // Get frontend error URL (uses returnOrigin if provided and allowed)
+  getFrontendErrorUrl(error: string, returnOrigin?: string): string {
+    const base = returnOrigin && ALLOWED_ORIGINS.includes(returnOrigin) ? returnOrigin : FRONTEND_URL;
+    return `${base}/auth/error?error=${encodeURIComponent(error)}`;
   },
 };

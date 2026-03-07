@@ -9,7 +9,9 @@ export const authController = {
   // GET /auth/google - Get Google OAuth URL
   async getGoogleAuthUrl(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const url = authService.getGoogleAuthUrl();
+      // Pass the frontend origin so we can redirect back to it after login
+      const returnOrigin = req.query.origin as string | undefined;
+      const url = authService.getGoogleAuthUrl(returnOrigin);
       sendSuccess(res, { url });
     } catch (error) {
       next(error);
@@ -19,10 +21,13 @@ export const authController = {
   // GET /auth/google/callback - Handle Google OAuth callback
   async googleCallback(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { code } = req.query;
+      const { code, state } = req.query;
+
+      // state contains the return origin from the initial auth request
+      const returnOrigin = typeof state === 'string' ? state : undefined;
 
       if (!code || typeof code !== 'string') {
-        const errorUrl = googleOAuthService.getFrontendErrorUrl('No authorization code provided');
+        const errorUrl = googleOAuthService.getFrontendErrorUrl('No authorization code provided', returnOrigin);
         return res.redirect(errorUrl);
       }
 
@@ -31,15 +36,17 @@ export const authController = {
 
       const tokens = await authService.handleGoogleCallback(code, userAgent, ipAddress);
 
-      // Redirect to frontend with tokens
+      // Redirect to the frontend origin that initiated the login
       const callbackUrl = googleOAuthService.getFrontendCallbackUrl(
         tokens.accessToken,
-        tokens.refreshToken
+        tokens.refreshToken,
+        returnOrigin
       );
       res.redirect(callbackUrl);
     } catch (error) {
       console.error('Google OAuth error:', error);
-      const errorUrl = googleOAuthService.getFrontendErrorUrl('Authentication failed');
+      const returnOrigin = typeof req.query.state === 'string' ? req.query.state : undefined;
+      const errorUrl = googleOAuthService.getFrontendErrorUrl('Authentication failed', returnOrigin);
       res.redirect(errorUrl);
     }
   },

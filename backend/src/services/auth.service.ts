@@ -18,8 +18,8 @@ export interface AuthTokens {
 
 export const authService = {
   // Get Google OAuth URL
-  getGoogleAuthUrl(): string {
-    return googleOAuthService.getAuthUrl();
+  getGoogleAuthUrl(returnOrigin?: string): string {
+    return googleOAuthService.getAuthUrl(returnOrigin);
   },
 
   // Handle Google OAuth callback
