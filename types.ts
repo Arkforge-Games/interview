@@ -6,7 +6,8 @@ export enum AppStep {
   QUESTION_REVIEW = 'QUESTION_REVIEW',
   STAGE = 'STAGE',
   ANALYSIS = 'ANALYSIS',
-  PRICING = 'PRICING'
+  PRICING = 'PRICING',
+  PROFILE = 'PROFILE'
 }
 
 export enum SessionMode {
@@ -49,7 +50,7 @@ export interface UserPreferences {
 export interface InterviewQuestion {
   id: string;
   text: string;
-  category: 'Intro' | 'Experience' | 'Behavioral' | 'Technical';
+  category: 'Intro' | 'Experience' | 'Behavioral' | 'Technical' | 'Scenario';
 }
 
 export interface SessionConfig {
@@ -122,6 +123,7 @@ export interface UserProfile {
   name: string;
   email: string;
   isGuest: boolean;
+  avatar?: string;
   cvText?: string;
 }
 
