@@ -35,6 +35,9 @@ COPY --from=backend-builder /app/backend/package*.json ./
 # Copy frontend build into public folder (served by Express)
 COPY --from=frontend-builder /app/frontend/dist ./public
 
+# Copy static assets (logo, og-image) from backend/public on top
+COPY backend/public/ ./public/
+
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
