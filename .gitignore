@@ -62,3 +62,7 @@ coverage
 .eslintcache
 
 Documents/*
+
+# Keep only static assets in backend/public (not build artifacts)
+backend/public/assets/
+backend/public/index.html
