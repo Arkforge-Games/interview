@@ -6,10 +6,11 @@ import { Stage } from './components/Stage';
 import { Analysis } from './components/Analysis';
 import { Home } from './components/Home';
 import { PricingPage } from './components/PricingPage';
+import { ProfilePage } from './components/ProfilePage';
 import { UpgradePrompt } from './components/UpgradePrompt';
 import { analyzeAnswer } from './services/geminiService';
 import { saveHistoryItem } from './services/historyService';
-import { getCurrentUser } from './services/authService';
+import { getCurrentUser, loginAsGuest } from './services/authService';
 import { isAuthenticated, setTokens, subscriptionApi } from './services/api';
 import { Loader2, Sparkles } from 'lucide-react';
 
@@ -72,9 +73,15 @@ export default function App() {
     }
 
     // Normal load
-    getCurrentUser().then(user => {
+    getCurrentUser().then(async (user) => {
+      if (!user) {
+        // Auto-login as guest so dashboard always shows
+        const guest = await loginAsGuest();
+        setCurrentUser(guest);
+        return;
+      }
       setCurrentUser(user);
-      if (user && !user.isGuest && isAuthenticated()) {
+      if (!user.isGuest && isAuthenticated()) {
         loadSubscription();
       }
     });
@@ -161,7 +168,13 @@ export default function App() {
         score: avgScore,
         results: analyzedAnswers
       };
-      await saveHistoryItem(historyItem as any);
+      await saveHistoryItem(historyItem as any, {
+        jobDescription: sessionConfig.jobDescription,
+        cvText: sessionConfig.cvText,
+        experienceLevel: sessionConfig.experienceLevel,
+        language: sessionConfig.language,
+        focusBalance: sessionConfig.focusBalance,
+      });
     }
 
     setAnswers(analyzedAnswers);
@@ -203,6 +216,8 @@ export default function App() {
         }}
         subscriptionInfo={subscriptionInfo}
         onPricing={goToSubscription}
+        onProfile={() => setStep(AppStep.PROFILE)}
+        user={currentUser}
         onUserChanged={(user) => {
           setCurrentUser(user);
           if (user && !user.isGuest && isAuthenticated()) {
@@ -244,6 +259,20 @@ export default function App() {
           onBack={() => { window.location.href = '/'; }}
           subscriptionInfo={subscriptionInfo}
           lockMode={subscriptionInfo?.requiresUpgrade && isAuthenticated()}
+        />
+      )}
+      {step === AppStep.PROFILE && (
+        <ProfilePage
+          user={currentUser}
+          subscriptionInfo={subscriptionInfo}
+          onBack={() => setStep(AppStep.HOME)}
+          onPricing={goToSubscription}
+          onLogout={() => {
+            setCurrentUser(null);
+            setSubscriptionInfo(null);
+            loginAsGuest().then(guest => setCurrentUser(guest));
+            setStep(AppStep.HOME);
+          }}
         />
       )}
 
