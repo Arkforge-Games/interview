@@ -38,6 +38,7 @@ jobs:
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           file: ./Dockerfile
+          no-cache: true
 
   deploy:
     runs-on: ubuntu-latest
