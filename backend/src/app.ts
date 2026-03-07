@@ -13,6 +13,7 @@ export function createApp(): Application {
 
   // Security middleware — CSP must allow all CDN scripts used by the frontend
   app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -20,7 +21,7 @@ export function createApp(): Application {
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://accounts.google.com", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         imgSrc: ["'self'", "data:", "https:", "blob:"],
-        connectSrc: ["'self'", "https://accounts.google.com", "https://generativelanguage.googleapis.com", "https://checkout.stripe.com", "https://api.stripe.com"],
+        connectSrc: ["'self'", "https://slayjobs.com", "https://www.slayjobs.com", "https://hobbyland-interview.azurewebsites.net", "https://accounts.google.com", "https://generativelanguage.googleapis.com", "https://checkout.stripe.com", "https://api.stripe.com"],
         frameSrc: ["'self'", "https://accounts.google.com", "https://checkout.stripe.com", "https://js.stripe.com"],
         mediaSrc: ["'self'", "blob:"],
         workerSrc: ["'self'", "blob:", "https://cdnjs.cloudflare.com"],

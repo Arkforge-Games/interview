@@ -122,7 +122,8 @@ async function refreshAccessToken(): Promise<boolean> {
 
 export const authApi = {
   getGoogleAuthUrl: async (): Promise<{ url: string }> => {
-    return apiRequest('/auth/google');
+    const origin = encodeURIComponent(window.location.origin);
+    return apiRequest(`/auth/google?origin=${origin}`);
   },
 
   verifyGoogleToken: async (idToken: string): Promise<{
@@ -189,6 +190,51 @@ export const subscriptionApi = {
     return apiRequest('/subscription/portal', {
       method: 'POST',
     });
+  },
+};
+
+// ==========================================
+// INTERVIEW API
+// ==========================================
+
+export const interviewApi = {
+  saveSession: async (data: {
+    jobTitle: string;
+    jobDescription?: string;
+    cvText?: string;
+    experienceLevel?: string;
+    language?: string;
+    focusBalance?: number;
+    aggregateScore: number;
+    answers: any[];
+  }): Promise<any> => {
+    return apiRequest('/interviews', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getHistory: async (limit = 50, offset = 0): Promise<any[]> => {
+    return apiRequest(`/interviews?limit=${limit}&offset=${offset}`);
+  },
+
+  getSession: async (id: string): Promise<any> => {
+    return apiRequest(`/interviews/${id}`);
+  },
+
+  deleteSession: async (id: string): Promise<void> => {
+    return apiRequest(`/interviews/${id}`, { method: 'DELETE' });
+  },
+
+  saveCv: async (cvText: string): Promise<any> => {
+    return apiRequest('/interviews/profile/cv', {
+      method: 'PUT',
+      body: JSON.stringify({ cvText }),
+    });
+  },
+
+  getCv: async (): Promise<{ cvText: string }> => {
+    return apiRequest('/interviews/profile/cv');
   },
 };
 

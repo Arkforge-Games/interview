@@ -14,17 +14,22 @@ export const getCurrentUser = async (): Promise<UserProfile | null> => {
         name: data.name,
         email: data.email,
         isGuest: false,
+        avatar: data.avatar,
       };
       await localforage.setItem(USER_KEY, user);
       return user;
     } catch (e) {
-      // Token expired or invalid, fall through
+      // Token expired or invalid — clear stale auth state so user can re-login
+      console.warn('Auth token expired, clearing session');
       clearTokens();
+      await localforage.removeItem(USER_KEY);
+      return null;
     }
   }
 
-  // Check for local guest user
-  return await localforage.getItem<UserProfile>(USER_KEY);
+  // Check for local guest/cached user (no API call needed)
+  const cached = await localforage.getItem<UserProfile>(USER_KEY);
+  return cached || null;
 };
 
 export const loginAsGuest = async (): Promise<UserProfile> => {
