@@ -15,9 +15,10 @@ model User {
   googleId    String?   @unique
   cvText      String?   @db.Text
 
-  sessions           Session[]
-  subscription       Subscription?
-  interviewSessions  InterviewSession[]
+  sessions              Session[]
+  subscription          Subscription?
+  interviewSessions     InterviewSession[]
+  trialCodeRedemptions  TrialCodeRedemption[]
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -85,6 +86,35 @@ model Subscription {
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
   @@index([status])
+}
+
+model TrialCode {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  trialDays   Int
+  maxUses     Int      // 0 = unlimited
+  usedCount   Int      @default(0)
+  active      Boolean  @default(true)
+
+  redemptions TrialCodeRedemption[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([code])
+}
+
+model TrialCodeRedemption {
+  id          String   @id @default(uuid())
+  trialCodeId String
+  trialCode   TrialCode @relation(fields: [trialCodeId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  redeemedAt  DateTime @default(now())
+
+  @@unique([trialCodeId, userId])
+  @@index([userId])
 }
 
 enum QuestionCategory {

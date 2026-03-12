@@ -191,6 +191,13 @@ export const subscriptionApi = {
       method: 'POST',
     });
   },
+
+  redeemCode: async (code: string): Promise<{ trialDays: number; trialEndsAt: string }> => {
+    return apiRequest('/subscription/redeem-code', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  },
 };
 
 // ==========================================

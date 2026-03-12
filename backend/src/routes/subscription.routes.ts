@@ -16,4 +16,7 @@ router.post('/checkout', requireAuth, subscriptionController.createCheckout);
 // POST /subscription/portal - Create Stripe Customer Portal session
 router.post('/portal', requireAuth, subscriptionController.createPortalSession);
 
+// POST /subscription/redeem-code - Redeem a trial access code
+router.post('/redeem-code', requireAuth, subscriptionController.redeemCode);
+
 export default router;

@@ -11,6 +11,27 @@ interface PricingPageProps {
 export const PricingPage: React.FC<PricingPageProps> = ({ onBack, subscriptionInfo, lockMode }) => {
   const [loading, setLoading] = useState<'monthly' | 'yearly' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [trialCode, setTrialCode] = useState('');
+  const [codeLoading, setCodeLoading] = useState(false);
+  const [codeSuccess, setCodeSuccess] = useState<string | null>(null);
+
+  const handleRedeemCode = async () => {
+    if (!trialCode.trim()) return;
+    setCodeLoading(true);
+    setError(null);
+    setCodeSuccess(null);
+    try {
+      const result = await subscriptionApi.redeemCode(trialCode.trim());
+      setCodeSuccess(`Trial activated! ${result.trialDays} days of free access.`);
+      setTrialCode('');
+      // Reload page after short delay to refresh subscription status
+      setTimeout(() => window.location.href = '/?subscription=success', 1500);
+    } catch (err: any) {
+      setError(err.message || 'Invalid trial code');
+    } finally {
+      setCodeLoading(false);
+    }
+  };
 
   const handleCheckout = async (planInterval: 'monthly' | 'yearly') => {
     setLoading(planInterval);
@@ -139,6 +160,43 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack, subscriptionIn
                 </span>
               ) : (
                 'Start 7-Day Free Trial'
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Trial Code Section */}
+        <div className="max-w-md mx-auto mt-16 pt-12 border-t border-slate-100">
+          <div className="text-center mb-6">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Have a Trial Code?</p>
+            <p className="text-xs text-slate-400">Enter your access code to unlock a free trial</p>
+          </div>
+
+          {codeSuccess && (
+            <div className="mb-4 p-4 bg-green-50 border border-green-100 rounded-2xl text-center">
+              <p className="text-sm text-green-600 font-medium">{codeSuccess}</p>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={trialCode}
+              onChange={(e) => setTrialCode(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === 'Enter' && handleRedeemCode()}
+              placeholder="Enter code (e.g. LAUNCH2026)"
+              className="flex-1 px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-indigo-300 focus:bg-white transition-all tracking-widest uppercase"
+              disabled={codeLoading}
+            />
+            <button
+              onClick={handleRedeemCode}
+              disabled={codeLoading || !trialCode.trim()}
+              className="px-6 py-3.5 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              {codeLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                'Activate'
               )}
             </button>
           </div>

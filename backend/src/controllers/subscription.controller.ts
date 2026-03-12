@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { subscriptionService } from '../services/subscription.service';
 import { stripeService } from '../services/stripe.service';
+import { trialCodeService } from '../services/trialcode.service';
 import { sendSuccess, sendError } from '../utils/response';
 import { Errors } from '../middleware/errorHandler';
 import { env } from '../config/environment';
@@ -53,6 +54,23 @@ export const subscriptionController = {
       if (!req.user) throw Errors.unauthorized();
       const url = await subscriptionService.createPortalSession(req.user.sub);
       sendSuccess(res, { url });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // POST /subscription/redeem-code
+  async redeemCode(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw Errors.unauthorized();
+      const { code } = req.body;
+
+      if (!code || typeof code !== 'string') {
+        throw Errors.badRequest('Trial code is required');
+      }
+
+      const result = await trialCodeService.redeemCode(req.user.sub, code);
+      sendSuccess(res, result);
     } catch (error) {
       next(error);
     }
