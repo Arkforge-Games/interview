@@ -184,7 +184,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack, subscriptionIn
               value={trialCode}
               onChange={(e) => setTrialCode(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && handleRedeemCode()}
-              placeholder="Enter code (e.g. LAUNCH2026)"
+              placeholder="Enter code (e.g. SLAYJOBS7)"
               className="flex-1 px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-indigo-300 focus:bg-white transition-all tracking-widest uppercase"
               disabled={codeLoading}
             />
