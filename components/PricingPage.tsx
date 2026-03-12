@@ -165,11 +165,12 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack, subscriptionIn
           </div>
         </div>
 
-        {/* Trial Code Section */}
-        <div className="max-w-md mx-auto mt-16 pt-12 border-t border-slate-100">
-          <div className="text-center mb-6">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Have a Trial Code?</p>
-            <p className="text-xs text-slate-400">Enter your access code to unlock a free trial</p>
+        {/* Promo Code Section */}
+        <div className="max-w-lg mx-auto mt-16">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="flex-1 h-px bg-slate-200"></div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Have a Promo Code?</p>
+            <div className="flex-1 h-px bg-slate-200"></div>
           </div>
 
           {codeSuccess && (
@@ -184,19 +185,19 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack, subscriptionIn
               value={trialCode}
               onChange={(e) => setTrialCode(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && handleRedeemCode()}
-              placeholder="Enter code (e.g. SLAYJOBS7)"
-              className="flex-1 px-5 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-indigo-300 focus:bg-white transition-all tracking-widest uppercase"
+              placeholder="ENTER PROMO CODE"
+              className="flex-1 px-6 py-4 bg-white border-2 border-slate-200 rounded-2xl text-sm font-bold text-slate-900 placeholder:text-slate-300 placeholder:tracking-[0.15em] focus:outline-none focus:border-indigo-400 transition-all tracking-widest uppercase text-center"
               disabled={codeLoading}
             />
             <button
               onClick={handleRedeemCode}
               disabled={codeLoading || !trialCode.trim()}
-              className="px-6 py-3.5 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              className="px-8 py-4 bg-slate-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
             >
               {codeLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                'Activate'
+                'Apply'
               )}
             </button>
           </div>
