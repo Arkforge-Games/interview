@@ -1,0 +1,46 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Main background gradient (pink-purple-blue) -->
+    <linearGradient id="bgGrad" x1="0" y1="1024" x2="1024" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e879a8"/>
+      <stop offset="0.35" stop-color="#c77ddb"/>
+      <stop offset="0.65" stop-color="#8b7ef5"/>
+      <stop offset="1" stop-color="#5bb8f5"/>
+    </linearGradient>
+    <!-- Top-right warm accent -->
+    <radialGradient id="warmAccent" cx="0.85" cy="0.1" r="0.45">
+      <stop offset="0" stop-color="#f5b87a" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#f5b87a" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Subtle shadow for depth -->
+    <filter id="iconShadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#4a3080" flood-opacity="0.25"/>
+    </filter>
+    <!-- Inner glow on camera body -->
+    <filter id="softGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="60" y="60" width="904" height="904" rx="200" fill="url(#bgGrad)"/>
+  <rect x="60" y="60" width="904" height="904" rx="200" fill="url(#warmAccent)"/>
+
+  <!-- Green notification dot -->
+  <circle cx="810" cy="210" r="42" fill="#4ade80"/>
+  <circle cx="810" cy="210" r="30" fill="#4ade80"/>
+  <circle cx="810" cy="210" r="42" fill="none" stroke="white" stroke-width="6" stroke-opacity="0.5"/>
+
+  <!-- Camera body group -->
+  <g filter="url(#iconShadow)">
+    <!-- Camera body (rounded rectangle) -->
+    <rect x="195" y="310" width="500" height="380" rx="90" fill="none" stroke="white" stroke-width="42" stroke-linejoin="round"/>
+
+    <!-- Camera lens/viewfinder part (right side trapezoid) -->
+    <path d="M695,410 L810,345 Q840,330 840,365 L840,635 Q840,670 810,655 L695,590" fill="none" stroke="white" stroke-width="42" stroke-linejoin="round" stroke-linecap="round"/>
+
+    <!-- Play triangle -->
+    <path d="M400,415 L400,590 L540,502 Z" fill="white" stroke="white" stroke-width="20" stroke-linejoin="round"/>
+  </g>
+</svg>
