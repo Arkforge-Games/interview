@@ -67,7 +67,7 @@ export const Home: React.FC<Props> = ({ onStartSession, onOpenSettings, onViewSe
       <div className="flex flex-col md:flex-row justify-between items-start gap-6">
         <div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Welcome, {currentUser.isGuest ? "Guest" : currentUser.name}</h1>
-          <p className="text-slate-500 mt-2 text-lg">Personalized AI coaching tailored to your CV and JD.</p>
+          <p className="text-slate-500 mt-2 text-lg">Personalized coaching tailored to your CV and JD.</p>
         </div>
         <div className="flex gap-3 items-center">
             {subscriptionInfo && (

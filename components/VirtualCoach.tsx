@@ -112,7 +112,7 @@ export const VirtualCoach: React.FC<Props> = ({ result, topic, mode, language, e
         <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center relative"><Bot size={24} className="text-white" /></div>
             <div>
-            <h3 className="font-bold text-white">AI Coach ({eduLevel})</h3>
+            <h3 className="font-bold text-white">Interview Coach ({eduLevel})</h3>
             <p className="text-xs text-slate-400">Ready to assist</p>
             </div>
         </div>

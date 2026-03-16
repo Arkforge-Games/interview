@@ -35,7 +35,7 @@ export const getCurrentUser = async (): Promise<UserProfile | null> => {
 export const loginAsGuest = async (): Promise<UserProfile> => {
   const guest: UserProfile = {
     id: 'guest',
-    email: 'guest@slayjobs.ai',
+    email: 'guest@slayjobs.com',
     name: 'Guest User',
     isGuest: true,
     cvText: ''

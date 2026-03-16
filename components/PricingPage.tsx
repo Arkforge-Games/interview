@@ -63,7 +63,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack, subscriptionIn
           <p className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-4">Unlock Your Full Potential</p>
           <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-4">SlayJobs Pro</h1>
           <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed">
-            Get unlimited interview questions, full AI performance reports, and executive-level coaching.
+            Get unlimited interview questions, full performance reports, and executive-level coaching.
           </p>
         </div>
 
@@ -87,7 +87,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack, subscriptionIn
             <ul className="space-y-3 mb-8">
               {[
                 'Unlimited interview questions',
-                'Full AI performance report',
+                'Full performance report',
                 'CEO-level answer coaching',
                 'Strategic framework analysis',
                 'Transcript & demo answers',
@@ -134,7 +134,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack, subscriptionIn
             <ul className="space-y-3 mb-8">
               {[
                 'Unlimited interview questions',
-                'Full AI performance report',
+                'Full performance report',
                 'CEO-level answer coaching',
                 'Strategic framework analysis',
                 'Transcript & demo answers',
