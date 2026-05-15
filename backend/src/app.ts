@@ -17,11 +17,11 @@ export function createApp(): Application {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://cdnjs.cloudflare.com", "https://aistudiocdn.com", "https://accounts.google.com", "https://apis.google.com"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://cdnjs.cloudflare.com", "https://aistudiocdn.com", "https://accounts.google.com", "https://apis.google.com", "https://www.googletagmanager.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://accounts.google.com", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         imgSrc: ["'self'", "data:", "https:", "blob:"],
-        connectSrc: ["'self'", "https://slayjobs.com", "https://www.slayjobs.com", "https://hobbyland-interview.azurewebsites.net", "https://accounts.google.com", "https://generativelanguage.googleapis.com", "https://checkout.stripe.com", "https://api.stripe.com"],
+        connectSrc: ["'self'", "https://slayjobs.com", "https://www.slayjobs.com", "https://hobbyland-interview.azurewebsites.net", "https://accounts.google.com", "https://generativelanguage.googleapis.com", "https://checkout.stripe.com", "https://api.stripe.com", "https://www.google-analytics.com", "https://*.analytics.google.com", "https://www.googletagmanager.com"],
         frameSrc: ["'self'", "https://accounts.google.com", "https://checkout.stripe.com", "https://js.stripe.com"],
         mediaSrc: ["'self'", "blob:"],
         workerSrc: ["'self'", "blob:", "https://cdnjs.cloudflare.com"],
@@ -48,6 +48,42 @@ export function createApp(): Application {
 
   // API routes
   app.use('/api/v1', routes);
+
+  // SEO: robots.txt and sitemap.xml — must come before the SPA catch-all
+  app.get('/robots.txt', (_req, res) => {
+    res.type('text/plain').send(
+`User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /auth/
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+Sitemap: https://slayjobs.com/sitemap.xml
+`
+    );
+  });
+  app.get(['/sitemap.xml', '/sitemap_index.xml'], (_req, res) => {
+    const base = 'https://slayjobs.com';
+    const lastmod = new Date().toISOString().slice(0, 10);
+    const urls = [
+      { loc: '/',             changefreq: 'weekly',  priority: '1.0' },
+      { loc: '/subscription', changefreq: 'monthly', priority: '0.8' },
+    ];
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map((u) => `  <url><loc>${base}${u.loc}</loc><lastmod>${lastmod}</lastmod><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`).join('\n')}
+</urlset>
+`;
+    res.type('application/xml').send(xml);
+  });
 
   // Serve static frontend in production
   if (env.isProduction) {
