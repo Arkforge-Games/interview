@@ -1,17 +1,17 @@
 import cors from 'cors';
 
-// Allowed frontend origins
 const allowedOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'https://hobbyland-interview.azurewebsites.net',
   'https://slayjobs.com',
   'https://www.slayjobs.com',
+  'https://slayjobs-production.up.railway.app',
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) {
       return callback(null, true);
     }
@@ -27,5 +27,5 @@ export const corsMiddleware = cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page'],
-  maxAge: 86400, // 24 hours
+  maxAge: 86400,
 });
