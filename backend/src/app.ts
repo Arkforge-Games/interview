@@ -21,7 +21,7 @@ export function createApp(): Application {
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://accounts.google.com", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         imgSrc: ["'self'", "data:", "https:", "blob:"],
-        connectSrc: ["'self'", "https://slayjobs.com", "https://www.slayjobs.com", "https://hobbyland-interview.azurewebsites.net", "https://accounts.google.com", "https://generativelanguage.googleapis.com", "https://checkout.stripe.com", "https://api.stripe.com", "https://www.google-analytics.com", "https://*.analytics.google.com", "https://www.googletagmanager.com"],
+        connectSrc: ["'self'", "https://slayjobs.com", "https://www.slayjobs.com", "https://hobbyland-interview.azurewebsites.net", "https://slayjobs-production.up.railway.app", "https://accounts.google.com", "https://generativelanguage.googleapis.com", "https://checkout.stripe.com", "https://api.stripe.com", "https://www.google-analytics.com", "https://*.analytics.google.com", "https://www.googletagmanager.com"],
         frameSrc: ["'self'", "https://accounts.google.com", "https://checkout.stripe.com", "https://js.stripe.com"],
         mediaSrc: ["'self'", "blob:"],
         workerSrc: ["'self'", "blob:", "https://cdnjs.cloudflare.com"],
@@ -29,8 +29,10 @@ export function createApp(): Application {
     },
   }));
 
-  // CORS
-  app.use(corsMiddleware);
+  // CORS — scoped to /api only so static assets never trip the allow-list check
+  // (browser sends Origin header on asset requests when loaded as part of a page;
+  //  a global app.use(corsMiddleware) returns 500 for assets on any new domain)
+  app.use('/api', corsMiddleware);
 
   // Request logging
   if (env.isDevelopment) {
