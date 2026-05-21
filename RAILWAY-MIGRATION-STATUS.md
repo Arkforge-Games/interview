@@ -72,6 +72,10 @@ Snapshot via `pg_dump` (PG16 client) from Azure Postgres 2026-05-19 → restored
 
 Azure Postgres remains the source of truth. Supabase is a point-in-time copy plus the few writes done via Railway since cutover.
 
+## Pre-migration Azure backup
+
+Full Azure App Service snapshot (env vars, container image tag, hostnames, DB dump) captured 2026-05-20 12:39 UTC. Backup files live at `~/.config/hobbyland-secrets/` (not in this repo — they carry live secrets). See [BACKUP-RESTORE.md](BACKUP-RESTORE.md) for the index, restore script, and refresh procedure.
+
 ## Connection strings
 
 ```
