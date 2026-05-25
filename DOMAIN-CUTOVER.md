@@ -112,4 +112,17 @@ Railway custom domain bindings (`railway domain slayjobs.com`) can be removed in
 
 ## Status log
 
-- 2026-05-21: Branch created, doc written, Railway custom domains NOT YET added (waiting on `railway login` token refresh).
+- 2026-05-21: Branch created, doc written, Railway custom domains added via dashboard, Cloudflare DNS swapped to Railway CNAME targets (`3le5xk73.up.railway.app` apex, `0as0ga8g.up.railway.app` www, both grey-cloud initially). Railway env vars `FRONTEND_URL` + `GOOGLE_REDIRECT_URI` updated to slayjobs.com. Railway's Let's Encrypt SSL provisioning HUNG ("Application not found" on ACME probe → cert never issued → wildcard `*.up.railway.app` served on slayjobs.com).
+- 2026-05-25: User enabled Cloudflare proxy (orange cloud) on both records, which sidesteps the Railway SSL issue entirely — Cloudflare terminates TLS with their Universal SSL cert (`CN=slayjobs.com` issued by Google Trust Services) and reverse-proxies to Railway. Cutover **COMPLETE**. slayjobs.com + www.slayjobs.com both 200, DB connected, frontend rendering. Azure App Service `hobbyland-interview` still running on `.azurewebsites.net` hostname (no longer receives slayjobs.com traffic, kept for rollback).
+
+## Final live state
+
+- DNS: `slayjobs.com` and `www.slayjobs.com` → Cloudflare proxied (104.21.33.7, 172.67.188.107)
+- Origin: Railway service `slayjobs` (`slayjobs-production.up.railway.app`)
+- SSL: Cloudflare Universal SSL (Google Trust Services WE1, expires Jul 23 2026, auto-renews)
+- Railway env: `FRONTEND_URL=https://slayjobs.com`, `GOOGLE_REDIRECT_URI=https://slayjobs.com/api/v1/auth/google/callback`
+- Azure binding `slayjobs.com` on `hobbyland-interview` App Service: **left in place** for rollback safety (Azure no longer receives traffic for it since DNS changed)
+
+## Key lesson — apply to future Hobbyland migrations
+
+For ANY Railway custom-domain setup at Cloudflare-managed Hobbyland domains: **turn Cloudflare proxy ON (orange cloud)**. Skips Railway's Let's Encrypt provisioning entirely. Faster, more reliable, adds CDN + DDoS protection + origin hiding for free. The earlier playbook step that said "proxy: keep OFF" was wrong for this workflow.
